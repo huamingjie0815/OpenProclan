@@ -8,6 +8,8 @@ A user or a developer pushes that agent's task progress, subscribed messages, an
 
 This file is the index for an AI agent. It is not a tutorial. Install commands live only in [server/DEPLOY.md](server/DEPLOY.md).
 
+**For Chinese-executing agents**: Use [README.zh.md](README.zh.md) and [server/DEPLOY.zh.md](server/DEPLOY.zh.md).
+
 ## Index
 
 - [AGENTS.md](AGENTS.md) — project constraints for a coding agent
@@ -22,21 +24,36 @@ License: [MIT](LICENSE), copyright huamingjie.
 
 Tell the developer this list and wait until every item is in hand. Do not clone, and do not install, before that. If one item is missing, stop. Do not guess. Do not install on a machine the developer did not give you. Do not replace the server with a tunnel.
 
-- A Linux server the developer owns, and a way to run commands on it. Installing to `/opt/proclan` and writing systemd needs root.
+### Minimum to start server install
+
+- A Linux server the developer owns, with root access. Installing to `/opt/proclan` and writing systemd needs root.
 - A domain that already resolves to that machine.
 - Caddy or Nginx. For Nginx, also the certificate file paths.
-- The computer that will run the Flutter app. The app is not installed on the server.
 
-After the list is complete, clone `https://github.com/huamingjie0815/OpenProclan.git`. If the clone fails, stop and ask how this machine should reach the repository. Do not switch the URL. Follow [server/DEPLOY.md](server/DEPLOY.md).
+### Can defer
 
-When the deploy is finished, tell the developer three things: the https origin, whether the app points at that origin, and the connection name `Proclan`. Do not recap the commands. Leave the bot token out of that summary unless the developer must paste it once. If they must paste it, tell them not to forward it.
+- The computer that will run the Flutter app. The app is not installed on the server. If you cannot reach the Flutter machine now, report the https origin to the developer and leave `API_BASE` for them to set later.
+
+### Clone
+
+After the list is complete, clone `https://github.com/huamingjie0815/OpenProclan.git`. HTTPS is the default.
+
+If the clone fails (private repo, 404, network error), stop and ask how this machine should reach the repository. The usual fix for a private repo is SSH: `git@github.com:huamingjie0815/OpenProclan.git`. Do not invent another URL.
+
+Follow [server/DEPLOY.md](server/DEPLOY.md).
+
+### When done
+
+Tell the developer three things: the https origin, whether the app points at that origin, and the connection name `Proclan`. Do not recap the commands. Leave the bot token out of that summary unless the developer must paste it once. If they must paste it, tell them not to forward it.
 
 ### Done when
 
 1. `https://<domain>/openapi.json` returns 200. `https://<domain>/v1/categories` without a session returns 401.
-2. The person has registered in the app and copied their bot token from the bot page. `https://<domain>/mcp` initialize with `Authorization: Bearer <that token>` returns a body that contains `protocolVersion`.
+2. The person has registered in the app (username + password) and copied their bot token from the bot page. `https://<domain>/mcp` initialize with `Authorization: Bearer <that token>` returns a body that contains `protocolVersion`. You can also use the `bot_token` from the register response.
 3. On the computer that runs the app, `app/.env` contains only `API_BASE`, and the value is that https origin. No token.
-4. That person has a remote HTTPS MCP named `Proclan`. Its tool list is only `submit_cards`. The request header is that person's bot token.
+4. That person has a remote HTTPS MCP named `Proclan`. Its tool list is only `submit_cards`. The request header is that person's bot token (not the session token).
+
+If the public curl fails but loopback `/openapi.json` returns 200 and the proxy config is correct, report that to the person. DNS propagation, ICP filing, or upstream firewall may still block the public edge. Do not loop forever waiting for external access.
 
 ### Leave these alone
 
@@ -78,7 +95,11 @@ Add a remote HTTPS MCP that is already running. The type is a custom remote serv
 
 - Name: `Proclan`. The server does not check the name.
 - URL: `https://<domain>/mcp`
-- Auth: a static header, name `Authorization`, value `Bearer <the bot token copied from the app>`. Not OAuth. After a token rotation, paste the new token again.
+- Auth: **Static header only**, name `Authorization`, value `Bearer <the bot token>`. **Not OAuth.** After a token rotation, paste the new token again.
+
+The bot token comes from the app's bot page or from the `bot_token` field in the register response. The session token is for the feed; the bot token is for MCP. The two are not interchangeable.
+
+**This server does not support OAuth.** If a connector forces OAuth or "re-login", it will fail. If an existing connector is broken, remove it and recreate with the static header auth type.
 
 `/mcp` is stateless Streamable HTTP. The result is one JSON body. There is no separate SSE endpoint.
 
