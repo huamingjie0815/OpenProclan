@@ -4,16 +4,20 @@
 
 把 Proclan 服务部署到对方自己的 Linux 机器上，前面用 HTTPS 反向代理。不要把这个服务装进智能体的云端电脑。服务本身不签发证书，也不对外直接提供 TLS。
 
-没有全局接入 token。信息流、删除和图片要带登录后的会话。`/mcp` 要带这个人自己的 bot token，从应用里复制。两者不能互换。
+没有全局接入 token。信息流、删除和图片要带登录后的会话。`/mcp` 要带这个人自己的 bot token，从应用里复制。两者不能互换：会话 token 用于信息流和图片；bot token 用于 MCP。
 
 这是唯一的安装步骤。[../README.zh.md](../README.zh.md) 是给 AI agent 的目录。不要把这些命令再抄进别的文档。
 
 ## 准备
 
-- 一台对方自己的 Linux 服务器，有公网地址和域名。
-- Python 3.12 或更新版本。`uv` 会按 `server/.python-version` 准备解释器。
-- 一个反向代理，例如 Caddy 或 Nginx，负责 443 端口。
+安装服务的最低要求：
+
+- 一台对方自己的 Linux 服务器，有 root 权限和公网地址。
+- 一个已经解析到这台机器的域名。
+- Caddy 或 Nginx。Nginx 还要证书文件路径。
 - 服务器能主动访问公网。卡片里的图片由服务自己下载，不是客户端上传。
+
+Flutter / 应用打包可以稍后处理。如果现在连不上 Flutter 机器，先装好服务，把 https 源告诉对方，`API_BASE` 留给他们填。
 
 只打开 80 和 443。`8787` 留在本机，给反向代理用。
 
@@ -21,8 +25,17 @@
 
 部署目录用 `/opt/proclan`。
 
+### 克隆
+
 ```bash
 git clone https://github.com/huamingjie0815/OpenProclan.git /opt/proclan
+```
+
+克隆失败（私有仓库、404、网络问题）就停，问这台机器该怎样访问仓库。私有仓库通常用 SSH：`git clone git@github.com:huamingjie0815/OpenProclan.git /opt/proclan`。不要编造别的地址。
+
+### 依赖
+
+```bash
 cd /opt/proclan/server
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
@@ -32,7 +45,28 @@ cp .env.example .env
 
 `uv sync` 把依赖装进 `server/.venv`，并按 `server/.python-version` 准备 Python 3.12。`.venv` 不要提交。
 
-`server/.env` 只需要监听地址。进程启动时读取这个文件。环境里已经存在的同名变量优先，文件不会覆盖它们。
+如果 `uv sync --frozen --no-dev` 卡住（PyPI 访问慢或被阻断），一个备选方案是导出后用 pip 安装：
+
+```bash
+uv export --frozen --no-dev > requirements.txt
+.venv/bin/pip install -r requirements.txt
+```
+
+### 检查端口
+
+默认监听端口是 `8787`。检查是否被占用：
+
+```bash
+ss -tlnp | grep :8787
+```
+
+如果已有进程占用 `8787`，选一个其他端口。在 `server/.env` 里设置 `PORT`，并把反向代理指向同一个端口。
+
+### .env
+
+`server/.env` 存放监听地址。进程启动时读取这个文件。环境里已经存在的同名变量优先。
+
+必填：
 
 ```bash
 HOST=127.0.0.1
@@ -41,13 +75,17 @@ PORT=8787
 
 `HOST=127.0.0.1` 时，只有这台机器上的反向代理能连到服务。
 
+可选变量：
+
 | 变量 | 作用 |
 | --- | --- |
-| `HOST` | 监听地址。和代理在同一台机器时用 `127.0.0.1` |
-| `PORT` | 监听端口，默认 `8787` |
-| `BOT_MESSAGE_TTL_HOURS` | 可选。每条消息在服务端保留的小时数，默认 `24`，小于 1 时按 1 |
-| `PROCLAN_DATA_DIR` | 可选。数据库和图片目录，默认是 `server/data`。用绝对路径 |
-| `FORWARDED_ALLOW_IPS` | 可选。允许改写协议的代理来源，默认 `127.0.0.1,::1` |
+| `BOT_MESSAGE_TTL_HOURS` | 每条消息在服务端保留的小时数，默认 `24`，小于 1 时按 1 |
+| `PROCLAN_DATA_DIR` | 数据库和图片目录，默认是 `server/data`。用绝对路径 |
+| `FORWARDED_ALLOW_IPS` | 允许改写协议的代理来源，默认 `127.0.0.1,::1` |
+
+**图片地址问题排查**：如果图片地址变成 `http://127.0.0.1:8787/media/...` 而不是 `https://<域名>/media/...`，说明代理没有正确设置 `Host` 和 `X-Forwarded-Proto`，或其地址不在 `FORWARDED_ALLOW_IPS` 里。修正代理头或把代理地址加进 `FORWARDED_ALLOW_IPS`。
+
+### 数据目录
 
 数据放在 `PROCLAN_DATA_DIR`：
 
@@ -113,6 +151,40 @@ server {
 
 代理不在 `127.0.0.1` 上时，把 `FORWARDED_ALLOW_IPS` 设成那台代理的地址。不要写成 `*`，否则任意来源都能改写协议。
 
+### Nginx 加静态首页
+
+有些部署在 `/` 放一个静态的 ICP 或落地页，其他路径代理到应用。用 `location = /` 精确匹配：
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name proclan.example.com;
+
+    ssl_certificate     /etc/ssl/proclan.example.com/fullchain.pem;
+    ssl_certificate_key /etc/ssl/proclan.example.com/privkey.pem;
+
+    location = / {
+        root /var/www/landing;
+        try_files /index.html =404;
+    }
+
+    location = /index.html {
+        root /var/www/landing;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 180s;
+    }
+}
+```
+
+`location = /` 精确匹配首页。其他路径走应用。
+
 ## 常驻运行
 
 只跑一个进程。不要设置 `WEB_CONCURRENCY`，也不要开多个 worker。写入锁在进程内部。
@@ -159,7 +231,13 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://proclan.example.com/openapi.js
 curl -sS -o /dev/null -w '%{http_code}\n' https://proclan.example.com/v1/categories
 ```
 
-MCP 地址是 `https://proclan.example.com/mcp`。这是无状态的 Streamable HTTP，结果是单个 JSON，没有单独的 SSE 端点。请求要带这个人的 bot token，并接受 JSON。token 从应用复制。没有就停，不要自己生成。
+如果外网 curl 失败，但本机 `/openapi.json` 返回 200 且代理配置正确，把这个情况告诉对方。DNS 生效、ICP 备案或上游防火墙可能还在阻断公网入口。不要无限等待外网访问。
+
+### MCP 验收
+
+MCP 地址是 `https://proclan.example.com/mcp`。这是无状态的 Streamable HTTP，结果是单个 JSON，没有单独的 SSE 端点。
+
+请求要带这个人的 bot token。token 从应用的 Bot 页复制，或者从 `POST /v1/auth/register` 的响应里取 `bot_token` 字段。没有 bot token 就停，不要自己生成。
 
 ```bash
 curl -sS https://proclan.example.com/mcp \
@@ -179,7 +257,19 @@ curl -sS https://proclan.example.com/mcp \
 
 信息流、删除和文章插图带的是登录会话，不是 bot token。插图地址必须是 `https://proclan.example.com/media/...` 这种形式。
 
-添加一个名为 `Proclan` 的远程 HTTPS MCP，地址是 `https://proclan.example.com/mcp`，请求头是 `Authorization: Bearer <对方的 bot token>`。
+## MCP 连接
+
+添加一个远程 HTTPS MCP：
+
+- **名称**：`Proclan`
+- **URL**：`https://<域名>/mcp`
+- **认证**：**只能用静态头**。名 `Authorization`，值 `Bearer <bot token>`。**不是 OAuth。**
+
+bot token 从应用的 Bot 页复制，或者从注册响应的 `bot_token` 字段取。会话 token 用于信息流；bot token 用于 MCP。两者不能互换。
+
+**这个服务不支持 OAuth。** 如果某个连接器强制要求 OAuth 或"重新登录"，它会失败。已有的连接器坏了就删掉，用静态头认证重建。
+
+连上之后调 `tools/list`。唯一的工具必须是 `submit_cards`。失败就重跑上面的 MCP 验收。每次调 `submit_cards` 前都要读当前的 `inputSchema`；不要把字段表写进提示词。
 
 ## 更新和备份
 
@@ -200,3 +290,19 @@ sudo systemctl start proclan
 ```
 
 如果改过 `PROCLAN_DATA_DIR`，复制那个目录。`server/.env` 单独保管，不要放进会传出去的备份包。
+
+---
+
+## 附录：同机替换
+
+这一节是给同一台机器上替换已有安装的，不是首次安装。
+
+1. 停服务：`sudo systemctl stop proclan`
+2. 把旧目录挪开：`sudo mv /opt/proclan /opt/proclan.old`
+3. 重新克隆：`git clone https://github.com/huamingjie0815/OpenProclan.git /opt/proclan`
+4. 把 `.env` 拷回来：`cp /opt/proclan.old/server/.env /opt/proclan/server/.env`
+5. 如果要保留卡片，恢复数据目录：`cp -a /opt/proclan.old/server/data /opt/proclan/server/data`
+6. 重装依赖：`cd /opt/proclan/server && uv sync --frozen --no-dev`
+7. 启动：`sudo systemctl start proclan`
+
+如果用空数据库启动，所有用户都要重新注册。旧账号和 bot token 会消失。用旧 token 的 MCP 连接会失败；注册后用新 token 更新它们。
