@@ -1,0 +1,6 @@
+#!/bin/sh
+# Forward submit_cards to the HTTP server started by scripts/serve.
+set -eu
+root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+cd "$root/server"
+exec uv run python -m proclan_server.mcp_stdio

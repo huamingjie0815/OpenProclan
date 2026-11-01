@@ -1,0 +1,11 @@
+#!/bin/sh
+# Release APK. Signing stays the Android debug key. Reads app/.env.
+set -eu
+root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+cd "$root/app"
+if [ ! -f .env ]; then
+  echo "missing app/.env. Copy app/.env.example and set API_BASE." >&2
+  exit 1
+fi
+flutter build apk --release --dart-define-from-file=.env
+echo "$root/app/build/app/outputs/flutter-apk/app-release.apk"

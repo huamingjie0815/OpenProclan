@@ -1,0 +1,12 @@
+#!/bin/sh
+# Usage: ./scripts/run [device]
+# Reads app/.env. Default device is macos.
+set -eu
+root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+cd "$root/app"
+device=${1:-macos}
+if [ ! -f .env ]; then
+  echo "missing app/.env. Copy app/.env.example and set API_BASE." >&2
+  exit 1
+fi
+exec flutter run -d "$device" --dart-define-from-file=.env
