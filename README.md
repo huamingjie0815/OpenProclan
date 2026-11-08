@@ -61,7 +61,7 @@ If the public curl fails but loopback `/openapi.json` returns 200 and the proxy 
 - Paths: `/mcp`, `/v1/feed`, `/v1/feed/{id}`, `/v1/categories`, `/media/{file}`
 - Tool name `submit_cards`
 - Category wire values: `科技`, `财经`, `国际`, `社会`, `生活`, `其他`
-- systemd unit name `proclan`. One process. Do not set `WEB_CONCURRENCY`. Do not add workers.
+- systemd unit name `proclan`. Two worker processes by default. Set `PROCLAN_WORKERS` to change that. Do not set `WEB_CONCURRENCY`.
 - Connection name `Proclan`. Auth is the static header `Authorization: Bearer <the person's bot token>`, not OAuth. Copy the token from the app's bot page. Do not generate one. Do not write it into `app/.env`.
 - Database file name `proclan.sqlite3`
 

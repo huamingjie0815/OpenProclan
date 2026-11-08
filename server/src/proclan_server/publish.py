@@ -9,6 +9,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from proclan_server.categories import CATEGORIES, CategoryName
+from proclan_server.limits import bot_limit_text, name_limit_text
 from proclan_server.net import is_public_url
 from proclan_server.store import Card, Store, new_id, now
 
@@ -24,12 +25,36 @@ _BOT_DESC = 200
 _SOURCE_URLS = 4
 _IMAGES = 6
 
-SUBMIT_CARDS_DOC = """提交已经写好的新闻卡片。填写以本工具当前 inputSchema 为准，不要沿用记忆里的字段。
+def submit_cards_doc(
+    burst: int,
+    refill_seconds: float,
+    *,
+    name_burst: int,
+    name_refill_seconds: float,
+    name_cap: int,
+) -> str:
+    return f"""提交已经写好的新闻卡片。填写以本工具当前 inputSchema 为准，不要沿用记忆里的字段。
 
-一次 1 到 8 张。文本或原文链接不合格时，整批不入库。
+一次 1 到 {MAX_CARDS} 张。{bot_limit_text(burst, refill_seconds)}
+{name_limit_text(name_burst, name_refill_seconds, name_cap)}
+文本或原文链接不合格时，整批不入库。
 服务不改写标题、摘要、正文、来源或分类。body 可以写 Markdown。
 不要提交已读状态。非公网或不是 http(s) 的 image_urls 会丢掉，卡片仍入库。
 """
+
+
+def cards_field_doc(
+    burst: int,
+    refill_seconds: float,
+    *,
+    name_burst: int,
+    name_refill_seconds: float,
+    name_cap: int,
+) -> str:
+    return (
+        f"一次 1 到 {MAX_CARDS} 张。{bot_limit_text(burst, refill_seconds)}"
+        f"{name_limit_text(name_burst, name_refill_seconds, name_cap)}"
+    )
 
 
 class CardRejected(Exception):
@@ -133,21 +158,35 @@ class CardIn(BaseModel):
             raise ValueError(_problem(exc)) from exc
 
 
-def publish_cards(store: Store, media_dir: Path, cards: list[dict], *, user_id: str) -> list[str]:
+def publish_cards(
+    store: Store,
+    media_dir: Path,
+    cards: list[dict],
+    *,
+    user_id: str,
+    burst: int = 48,
+    refill_seconds: float = 2,
+    name_cap: int = 32,
+    name_burst: int = 8,
+    name_refill_seconds: float = 60,
+) -> list[str]:
     del media_dir  # kept so callers stay the same; new cards are not written to disk
     ready = _validate(cards)
     rows = _rows([(card, _public_images(card)) for card in ready])
-    for row in rows:
-        row.user_id = user_id
-    store.insert_cards(rows)
-    stamped = now().isoformat()
+    descriptions: dict[str, str] = {}
     for card, row in zip(ready, rows, strict=True):
-        store.remember_bot(
-            user_id,
-            row.created_bot,
-            created_at=stamped,
-            bot_desc=card.bot_desc,
-        )
+        row.user_id = user_id
+        descriptions[row.created_bot] = card.bot_desc
+    stamped = now().isoformat()
+    store.publish_batch(
+        rows,
+        [(user_id, name, stamped, desc) for name, desc in descriptions.items()],
+        burst=burst,
+        refill_seconds=refill_seconds,
+        name_cap=name_cap,
+        name_burst=name_burst,
+        name_refill_seconds=name_refill_seconds,
+    )
     return [row.id for row in rows]
 
 

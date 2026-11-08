@@ -1,4 +1,6 @@
+import asyncio
 import sqlite3
+import threading
 from pathlib import Path
 
 import pytest
@@ -8,6 +10,7 @@ from httpx import ASGITransport, AsyncClient
 from proclan_server.app import create_app
 from proclan_server.categories import CATEGORIES
 from proclan_server.config import Settings
+from proclan_server.limits import NameCap, RateLimited
 from proclan_server.publish import CardIn, CardRejected, publish_cards
 from proclan_server.set_password import main as set_password_main
 from proclan_server.store import Card, Store, new_id, now
@@ -170,11 +173,19 @@ async def test_submit_cards_schema_is_the_contract(api):
             tool = (await mcp.list_tools())[0]
     assert tool.name == "submit_cards"
     assert "inputSchema" in tool.description
+    assert "48" in tool.description
+    assert "每 2 秒恢复 1 张" in tool.description
+    assert "32" in tool.description
+    assert "每 60 秒再增加 1 个" in tool.description
     raw = tool.model_dump(by_alias=True)
     schema = raw.get("inputSchema") or raw.get("input_schema")
     cards = schema["properties"]["cards"]
     assert cards["minItems"] == 1
     assert cards["maxItems"] == 8
+    assert "48" in cards["description"]
+    assert "每 2 秒恢复 1 张" in cards["description"]
+    assert "32" in cards["description"]
+    assert "每 60 秒再增加 1 个" in cards["description"]
     item = cards["items"]
     if "$ref" in item:
         item = schema["$defs"][item["$ref"].rsplit("/", 1)[-1]]
@@ -202,11 +213,14 @@ async def test_cards_belong_to_the_token_and_expire_after_a_day(api):
     headers = _auth(owner["token"])
     feed = (await client.get("/v1/feed", headers=headers)).json()["cards"]
     assert [item["title"] for item in feed] == ["今天"]
+    assert (await client.get(f"/v1/feed/{old[0]}", headers=headers)).status_code == 404
     assert (await client.get(f"/v1/feed/{theirs[0]}", headers=headers)).status_code == 404
     assert (await client.delete(f"/v1/feed/{theirs[0]}", headers=headers)).status_code == 404
     names = (await client.get("/v1/bots", headers=headers)).json()["bots"]
     assert [item["name"] for item in names] == ["Proclan", "旧 bot"]
     assert app.state.store.get_card(kept[0], user_id=owner["user"]["id"]) is not None
+    assert app.state.store.get_card(old[0]) is not None
+    app.state.store.prune(before="2001-01-01T00:00:00+00:00")
     assert app.state.store.get_card(old[0]) is None
 
 
@@ -610,3 +624,342 @@ async def test_login_locks_after_repeated_failures(api):
         json={"username": "Ada", "password": "password-1"},
     )
     assert locked.status_code == 429
+
+
+def _mcp_headers(token: str) -> dict[str, str]:
+    return {"accept": "application/json, text/event-stream", **_auth(token)}
+
+
+def _submit_body(title: str, bot: str = "Proclan", *, bot_desc: str = "盯着值得看的科技和财经。") -> dict:
+    return {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "submit_cards",
+            "arguments": {"cards": [card(title=title, created_bot=bot, bot_desc=bot_desc)]},
+        },
+    }
+
+
+async def _client(tmp_path: Path, **overrides):
+    app = create_app(settings(tmp_path, **overrides))
+    transport = ASGITransport(app=app)
+    client = AsyncClient(transport=transport, base_url="http://test")
+    await client.__aenter__()
+    return client, app
+
+
+async def test_concurrent_publishes_all_land(tmp_path: Path):
+    app = create_app(settings(tmp_path))
+    store = app.state.store
+    errors: list[BaseException] = []
+
+    def write(index: int) -> None:
+        try:
+            publish_cards(
+                store,
+                app.state.settings.media_dir,
+                [card(title=f"卡{index}", created_bot=f"bot-{index}")],
+                user_id="user-1",
+            )
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=write, args=(index,)) for index in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    titles = {item.title for item in store.list_cards(category=None, limit=20, user_id="user-1")}
+    assert titles == {f"卡{index}" for index in range(8)}
+
+
+async def test_feed_read_runs_alongside_another_users_publish(tmp_path: Path):
+    app = create_app(settings(tmp_path))
+    store = app.state.store
+    errors: list[BaseException] = []
+    stop = threading.Event()
+
+    def read() -> None:
+        try:
+            while not stop.is_set():
+                store.list_cards(category=None, limit=10, user_id="reader")
+        except Exception as exc:
+            errors.append(exc)
+
+    def write() -> None:
+        try:
+            for index in range(10):
+                publish_cards(
+                    store,
+                    app.state.settings.media_dir,
+                    [card(title=f"写{index}", created_bot="writer")],
+                    user_id="writer",
+                )
+        except Exception as exc:
+            errors.append(exc)
+        finally:
+            stop.set()
+
+    reader = threading.Thread(target=read)
+    writer = threading.Thread(target=write)
+    reader.start()
+    writer.start()
+    writer.join()
+    reader.join()
+    assert errors == []
+    assert len(store.list_cards(category=None, limit=20, user_id="writer")) == 10
+
+
+async def test_concurrent_bad_passwords_still_lock_the_account(api):
+    client, _ = api
+    await _register(client)
+
+    async def fail() -> int:
+        response = await client.post(
+            "/v1/auth/login",
+            json={"username": "Ada", "password": "wrong-password"},
+        )
+        return response.status_code
+
+    statuses = await asyncio.gather(*[fail() for _ in range(12)])
+    assert set(statuses) <= {401, 429}
+    assert 401 in statuses
+    locked = await client.post(
+        "/v1/auth/login",
+        json={"username": "Ada", "password": "password-1"},
+    )
+    assert locked.status_code == 429
+    assert locked.json()["detail"] == "retry later"
+
+
+async def test_bot_burst_rejects_the_rest_of_one_bot(tmp_path: Path):
+    client, app = await _client(tmp_path, bot_burst=2)
+    try:
+        async with app.router.lifespan_context(app):
+            account = (await client.post(
+                "/v1/auth/register",
+                json={"username": "Ada", "password": "password-1"},
+            )).json()
+            other = (await client.post(
+                "/v1/auth/register",
+                json={"username": "Bea", "password": "password-1"},
+            )).json()
+            headers = _mcp_headers(account["bot_token"])
+            first = await client.post("/mcp", json=_submit_body("一"), headers=headers)
+            second = await client.post("/mcp", json=_submit_body("二"), headers=headers)
+            third = await client.post("/mcp", json=_submit_body("三"), headers=headers)
+            assert first.status_code == 200
+            assert second.status_code == 200
+            assert third.status_code == 429
+            assert third.json()["detail"] == "retry later"
+            assert third.headers["retry-after"] == "2"
+            kept = await client.post("/mcp", json=_submit_body("别人的 bot", bot="另一"), headers=headers)
+            assert kept.status_code == 200
+            bea = await client.post(
+                "/mcp",
+                json=_submit_body("同名"),
+                headers=_mcp_headers(other["bot_token"]),
+            )
+            assert bea.status_code == 200
+            listed = await client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {}},
+                headers=headers,
+            )
+            assert listed.status_code == 200
+            assert "submit_cards" in listed.text
+        feed = (await client.get("/v1/feed", headers=_auth(account["token"]))).json()["cards"]
+        assert [item["title"] for item in feed] == ["别人的 bot", "二", "一"]
+        bea_feed = (await client.get("/v1/feed", headers=_auth(other["token"]))).json()["cards"]
+        assert [item["title"] for item in bea_feed] == ["同名"]
+    finally:
+        await client.aclose()
+
+
+async def test_concurrent_burst_stores_only_the_capacity(tmp_path: Path):
+    app = create_app(settings(tmp_path, bot_burst=48))
+    store = app.state.store
+    errors: list[BaseException] = []
+    limited = 0
+    lock = threading.Lock()
+
+    def write(index: int) -> None:
+        nonlocal limited
+        try:
+            publish_cards(
+                store,
+                app.state.settings.media_dir,
+                [card(title=f"冲{index}")],
+                user_id="user-1",
+                burst=48,
+            )
+        except RateLimited:
+            with lock:
+                limited += 1
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=write, args=(index,)) for index in range(60)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    stored = store.list_cards(category=None, limit=100, user_id="user-1")
+    assert len(stored) == 48
+    assert limited == 12
+
+
+async def test_rotating_bot_names_stop_at_the_admission_burst(tmp_path: Path):
+    client, app = await _client(tmp_path, bot_name_burst=1, bot_name_cap=8, bot_burst=48)
+    try:
+        async with app.router.lifespan_context(app):
+            account = (await client.post(
+                "/v1/auth/register",
+                json={"username": "Ada", "password": "password-1"},
+            )).json()
+            other = (await client.post(
+                "/v1/auth/register",
+                json={"username": "Bea", "password": "password-1"},
+            )).json()
+            headers = _mcp_headers(account["bot_token"])
+            first = await client.post("/mcp", json=_submit_body("一", bot="甲"), headers=headers)
+            second = await client.post("/mcp", json=_submit_body("二", bot="乙"), headers=headers)
+            again = await client.post("/mcp", json=_submit_body("三", bot="甲"), headers=headers)
+            bea = await client.post(
+                "/mcp",
+                json=_submit_body("别人"),
+                headers=_mcp_headers(other["bot_token"]),
+            )
+            assert first.status_code == 200
+            assert second.status_code == 429
+            assert second.json()["detail"] == "retry later"
+            assert again.status_code == 200
+            assert bea.status_code == 200
+        feed = (await client.get("/v1/feed", headers=_auth(account["token"]))).json()["cards"]
+        assert [item["title"] for item in feed] == ["三", "一"]
+    finally:
+        await client.aclose()
+
+
+def test_new_name_batch_rolls_back_and_the_cap_stays_a_tool_error(tmp_path: Path):
+    app = create_app(settings(tmp_path, bot_burst=48))
+    store = app.state.store
+    media = app.state.settings.media_dir
+    with pytest.raises(RateLimited):
+        publish_cards(
+            store,
+            media,
+            [card(title="甲卡", created_bot="甲"), card(title="乙卡", created_bot="乙")],
+            user_id="user-1",
+            name_burst=1,
+            name_cap=8,
+        )
+    assert store.list_cards(category=None, limit=10, user_id="user-1") == []
+    publish_cards(store, media, [card(title="甲卡", created_bot="甲")], user_id="user-1", name_cap=1)
+    with pytest.raises(NameCap, match="先删掉不用的"):
+        publish_cards(store, media, [card(title="乙卡", created_bot="乙")], user_id="user-1", name_cap=1)
+    titles = [item.title for item in store.list_cards(category=None, limit=10, user_id="user-1")]
+    assert titles == ["甲卡"]
+    publish_cards(
+        store,
+        media,
+        [card(title="别人的", created_bot="乙")],
+        user_id="user-2",
+        name_cap=1,
+    )
+    assert [item.title for item in store.list_cards(category=None, limit=10, user_id="user-2")] == ["别人的"]
+
+
+def test_deleting_a_bot_name_does_not_refill_its_cards(tmp_path: Path):
+    app = create_app(settings(tmp_path, bot_burst=1, bot_name_burst=8))
+    store = app.state.store
+    media = app.state.settings.media_dir
+    publish_cards(store, media, [card(title="甲卡", created_bot="甲")], user_id="user-1", burst=1)
+    assert store.delete_bot("user-1", "甲")
+    with pytest.raises(RateLimited):
+        publish_cards(store, media, [card(title="又一张", created_bot="甲")], user_id="user-1", burst=1)
+    titles = [item.title for item in store.list_cards(category=None, limit=10, user_id="user-1")]
+    assert titles == ["甲卡"]
+
+
+async def test_mixed_batch_does_not_spend_the_other_bot(tmp_path: Path):
+    app = create_app(settings(tmp_path))
+    media = app.state.settings.media_dir
+    publish_cards(app.state.store, media, [card(title="已有", created_bot="甲")], user_id="user-1", burst=1)
+    with pytest.raises(RateLimited):
+        publish_cards(
+            app.state.store,
+            media,
+            [card(title="再来", created_bot="甲"), card(title="新的", created_bot="乙")],
+            user_id="user-1",
+            burst=1,
+        )
+    titles = [item.title for item in app.state.store.list_cards(category=None, limit=10, user_id="user-1")]
+    assert titles == ["已有"]
+    publish_cards(
+        app.state.store,
+        media,
+        [card(title="乙的第一张", created_bot="乙")],
+        user_id="user-1",
+        burst=1,
+    )
+    titles = [item.title for item in app.state.store.list_cards(category=None, limit=10, user_id="user-1")]
+    assert titles == ["乙的第一张", "已有"]
+
+
+async def test_mcp_body_over_one_mebibyte_is_rejected(tmp_path: Path):
+    client, app = await _client(tmp_path)
+    try:
+        payload = b'{"jsonrpc":"2.0"}' + b"x" * (1024 * 1024)
+        response = await client.post(
+            "/mcp",
+            content=payload,
+            headers={"content-type": "application/json"},
+        )
+        assert response.status_code == 413
+        assert response.json()["detail"] == "payload too large"
+        assert app.state.store.list_cards(category=None, limit=10) == []
+    finally:
+        await client.aclose()
+
+
+async def test_mcp_inflight_limit_rejects_the_next_call(tmp_path: Path):
+    client, app = await _client(tmp_path, mcp_inflight=1)
+    entered = threading.Event()
+    release = threading.Event()
+    original = app.state.store.publish_batch
+
+    def blocked(*args, **kwargs):
+        entered.set()
+        assert release.wait(5)
+        return original(*args, **kwargs)
+
+    app.state.store.publish_batch = blocked
+    try:
+        async with app.router.lifespan_context(app):
+            account = (await client.post(
+                "/v1/auth/register",
+                json={"username": "Ada", "password": "password-1"},
+            )).json()
+            headers = _mcp_headers(account["bot_token"])
+
+            async def first():
+                return await client.post("/mcp", json=_submit_body("慢"), headers=headers)
+
+            pending = asyncio.create_task(first())
+            assert await asyncio.to_thread(entered.wait, 5)
+            blocked_response = await client.post("/mcp", json=_submit_body("快"), headers=headers)
+            assert blocked_response.status_code == 429
+            assert blocked_response.json()["detail"] == "retry later"
+            release.set()
+            opened = await pending
+            assert opened.status_code == 200
+        feed = (await client.get("/v1/feed", headers=_auth(account["token"]))).json()["cards"]
+        assert [item["title"] for item in feed] == ["慢"]
+    finally:
+        release.set()
+        await client.aclose()

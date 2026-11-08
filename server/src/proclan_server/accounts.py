@@ -45,16 +45,12 @@ def login(store: Store, *, username: str, password: str) -> tuple[User, str]:
     moment = _now()
     if user.locked_until and user.locked_until > moment.isoformat():
         raise AccountError(429, "retry later")
-    if user.locked_until:
-        store.clear_login_failures(user.id)
-        user = store.user_by_id(user.id) or user
     if not isinstance(password, str) or not verify_password(user.password_hash, password):
-        fails = user.login_fails + 1
-        locked = None
-        if fails >= 10:
-            fails = 0
-            locked = (moment + timedelta(minutes=15)).isoformat()
-        store.note_login_failure(user.id, fails=fails, locked_until=locked)
+        store.record_login_failure(
+            user.id,
+            now=moment.isoformat(),
+            lock_until=(moment + timedelta(minutes=15)).isoformat(),
+        )
         raise AccountError(401, "invalid credentials")
     store.clear_login_failures(user.id)
     fresh = store.user_by_id(user.id)

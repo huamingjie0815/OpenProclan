@@ -178,7 +178,13 @@ server {
 
 ## 常驻运行
 
-只跑一个进程。不要设置 `WEB_CONCURRENCY`，也不要开多个 worker。写入锁在进程内部。
+服务默认跑两个 worker 进程。用 `PROCLAN_WORKERS` 修改。不要设置 `WEB_CONCURRENCY`。数据库仍是一份 `proclan.sqlite3`，使用 WAL。一次写入是一条短的立即事务。写锁等待超过 5 秒时返回 429 `retry later`。
+
+每个 bot 可以一次落地 48 张卡，之后每 2 秒再允许 1 张。`PROCLAN_BOT_BURST` 和 `PROCLAN_BOT_REFILL_SECONDS` 修改这两个数。当前生效的数字写在 `submit_cards` 的工具说明里。超过限额返回 429 `retry later`。请求体超过 1 MiB 返回 413 `payload too large`。
+
+每个账号最多保留 32 个 bot 名字。新名字一次可以加 8 个，之后每 60 秒再加 1 个。新名字加得更快时返回 429 `retry later`。已经有 32 个名字时，工具会说明先删掉不用的。这些数字也写在 `submit_cards` 的工具说明里。
+
+worker 数来自环境变量，不写在单元里。
 
 下面的单元使用上面的克隆路径。`.env` 里已经有 `HOST` 和 `PORT`。不要在单元里写 token。
 

@@ -61,7 +61,7 @@ Proclan 出自 Proclaim Wall（proclaimwall）。它是 personal agent 的公告
 - 路径：`/mcp`，`/v1/feed`，`/v1/feed/{id}`，`/v1/categories`，`/media/{file}`
 - 工具名 `submit_cards`
 - 分类传输值：`科技`、`财经`、`国际`、`社会`、`生活`、`其他`
-- systemd 单元名 `proclan`。只跑一个进程。不要设置 `WEB_CONCURRENCY`，不要开多个 worker
+- systemd 单元名 `proclan`。默认两个 worker 进程。用 `PROCLAN_WORKERS` 修改。不要设置 `WEB_CONCURRENCY`
 - 连接名 `Proclan`。认证是静态请求头 `Authorization: Bearer <对方的 bot token>`，不是 OAuth。token 从应用的 Bot 页复制，不要自己生成，不要写进 `app/.env`
 - 数据库文件名 `proclan.sqlite3`
 
