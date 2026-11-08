@@ -4,7 +4,7 @@
 
 把 Proclan 服务部署到对方自己的 Linux 机器上，前面用 HTTPS 反向代理。不要把这个服务装进智能体的云端电脑。服务本身不签发证书，也不对外直接提供 TLS。
 
-没有全局接入 token。信息流、删除和图片要带登录后的会话。`/mcp` 要带这个人自己的 bot token，从应用里复制。两者不能互换：会话 token 用于信息流和图片；bot token 用于 MCP。
+没有全局接入 token。信息流和删除要带登录后的会话。已经落在 `/media` 的图片也带这个会话。`/mcp` 要带这个人自己的 bot token，从应用里复制。两者不能互换：会话 token 用于信息流和这些已保存的图片；bot token 用于 MCP。
 
 这是唯一的安装步骤。[../README.zh.md](../README.zh.md) 是给 AI agent 的目录。不要把这些命令再抄进别的文档。
 
@@ -15,7 +15,6 @@
 - 一台对方自己的 Linux 服务器，有 root 权限和公网地址。
 - 一个已经解析到这台机器的域名。
 - Caddy 或 Nginx。Nginx 还要证书文件路径。
-- 服务器能主动访问公网。卡片里的图片由服务自己下载，不是客户端上传。
 
 Flutter / 应用打包可以稍后处理。如果现在连不上 Flutter 机器，先装好服务，把 https 源告诉对方，`API_BASE` 留给他们填。
 
@@ -83,16 +82,16 @@ PORT=8787
 | `PROCLAN_DATA_DIR` | 数据库和图片目录，默认是 `server/data`。用绝对路径 |
 | `FORWARDED_ALLOW_IPS` | 允许改写协议的代理来源，默认 `127.0.0.1,::1` |
 
-**图片地址问题排查**：如果图片地址变成 `http://127.0.0.1:8787/media/...` 而不是 `https://<域名>/media/...`，说明代理没有正确设置 `Host` 和 `X-Forwarded-Proto`，或其地址不在 `FORWARDED_ALLOW_IPS` 里。修正代理头或把代理地址加进 `FORWARDED_ALLOW_IPS`。
+**图片地址问题排查**：已经落在磁盘上的图片从 `/media` 提供。如果这些地址变成 `http://127.0.0.1:8787/media/...` 而不是 `https://<域名>/media/...`，说明代理没有正确设置 `Host` 和 `X-Forwarded-Proto`，或其地址不在 `FORWARDED_ALLOW_IPS` 里。修正代理头或把代理地址加进 `FORWARDED_ALLOW_IPS`。新卡的图片是提交的 URL，不用这两项。
 
 ### 数据目录
 
 数据放在 `PROCLAN_DATA_DIR`：
 
 - `proclan.sqlite3`：卡片
-- `media/`：下载后的图片
+- `media/`：旧卡仍在引用的图片文件
 
-这个目录会随卡片变大。不要删除正在使用的 `media/`，否则文章里的插图会消失。
+新卡保存提交的 URL，不再往这里加文件。这些旧卡过期或被删除后，目录会变小。不要删掉仍被卡片引用的文件，否则那张图会消失。
 
 ## 账号
 
@@ -107,20 +106,13 @@ uv run python -m proclan_server.set_password <username> <new-password>
 
 ## HTTPS
 
-代理和本服务在同一台机器上时，保持 `FORWARDED_ALLOW_IPS` 的默认值。代理必须把原始域名放进 `Host`，并把 `X-Forwarded-Proto` 设为 `https`。图片地址用这两个值拼出来。代理没被信任，或没传这两项时，图片地址会变成 `http://127.0.0.1:8787/media/...`，手机上的应用打不开。
-
-一次提交最多 8 张卡、每张最多 6 张图，每张图的下载上限是 15 秒。把代理的读超时设到至少 180 秒。图片多并且源站慢时再加大。
+代理和本服务在同一台机器上时，保持 `FORWARDED_ALLOW_IPS` 的默认值。代理必须把原始域名放进 `Host`，并把 `X-Forwarded-Proto` 设为 `https`。已经在磁盘上的图片，服务用这两个值拼出 `/media` 地址。代理没被信任，或没传这两项时，这些地址会变成 `http://127.0.0.1:8787/media/...`，手机上的应用打不开。新卡的图片是提交的 URL，不用这两项。
 
 ### Caddy
 
 ```caddy
 proclan.example.com {
-    reverse_proxy 127.0.0.1:8787 {
-        transport http {
-            response_header_timeout 180s
-            read_timeout 180s
-        }
-    }
+    reverse_proxy 127.0.0.1:8787
 }
 ```
 
@@ -144,7 +136,6 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_read_timeout 180s;
     }
 }
 ```
@@ -255,7 +246,7 @@ curl -sS https://proclan.example.com/mcp \
 
 在运行应用的那台电脑上，把 `API_BASE` 设成这个 https 源，然后按 [../app/README.zh.md](../app/README.zh.md) 做。不要在服务器上编译应用。不要把地址写进源码。
 
-信息流、删除和文章插图带的是登录会话，不是 bot token。插图地址必须是 `https://proclan.example.com/media/...` 这种形式。
+信息流和删除带的是登录会话，不是 bot token。已经落在 `/media` 的图片也带这个会话。新卡的图片是提交的 http(s)，这些请求不带会话。
 
 ## MCP 连接
 

@@ -81,7 +81,9 @@ abstract class FeedClient {
   Future<List<String>> categories();
   Future<List<FeedCard>> feed();
   Future<void> deleteCard(String id);
-  Map<String, String> get imageHeaders => const {};
+
+  /// Session header for this server's `/media` files. Remote URLs get none.
+  Map<String, String> imageHeadersFor(String url) => const {};
 }
 
 class HttpFeedClient implements FeedClient {
@@ -104,7 +106,12 @@ class HttpFeedClient implements FeedClient {
       token.isEmpty ? const {} : {'Authorization': 'Bearer $token'};
 
   @override
-  Map<String, String> get imageHeaders => _headers;
+  Map<String, String> imageHeadersFor(String url) {
+    if (token.isEmpty || !url.startsWith('$baseUrl/media/')) {
+      return const {};
+    }
+    return _headers;
+  }
 
   @override
   Future<List<String>> categories() async {

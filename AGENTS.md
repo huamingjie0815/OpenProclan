@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Proclan comes from Proclaim Wall (proclaimwall). It is the announcement wall for a personal agent. An agent submits finished cards over MCP. The server checks them, stores images, and inserts them. The Flutter app reads by account. Do not ship sample cards. Both languages call the product Proclan.
+Proclan comes from Proclaim Wall (proclaimwall). It is the announcement wall for a personal agent. An agent submits finished cards over MCP. The server checks them, stores the submitted image URLs, and inserts them. The Flutter app reads by account. Do not ship sample cards. Both languages call the product Proclan.
 
 This file is the constraint file for a coding agent. It is English only.
 

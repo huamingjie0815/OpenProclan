@@ -40,7 +40,12 @@ class FakeFeedClient implements FeedClient {
   }
 
   @override
-  Map<String, String> get imageHeaders => const {};
+  Map<String, String> imageHeadersFor(String url) {
+    if (url.startsWith('http://test/media/')) {
+      return const {'Authorization': 'Bearer session'};
+    }
+    return const {};
+  }
 }
 
 TextStyle? _styleOf(WidgetTester tester, String snippet) {
@@ -200,6 +205,12 @@ void main() {
       expect(find.text('摘要'), findsOneWidget);
       expect(find.byType(CachedNetworkImage), findsOneWidget);
       expect(
+        tester
+            .widget<CachedNetworkImage>(find.byType(CachedNetworkImage))
+            .httpHeaders,
+        isNull,
+      );
+      expect(
         tester.getTopLeft(find.byType(CachedNetworkImage)).dx,
         greaterThan(tester.getTopLeft(find.text('带图')).dx),
       );
@@ -215,6 +226,12 @@ void main() {
       await tester.pump();
       expect(find.byType(CachedNetworkImage), findsOneWidget);
       expect(
+        tester
+            .widget<CachedNetworkImage>(find.byType(CachedNetworkImage))
+            .httpHeaders,
+        isNull,
+      );
+      expect(
         tester.getTopLeft(find.byType(CachedNetworkImage)).dy,
         lessThan(tester.getTopLeft(find.text('摘要')).dy),
       );
@@ -222,6 +239,53 @@ void main() {
         tester.getTopLeft(find.text('摘要')).dy,
         lessThan(tester.getTopLeft(find.text('正文')).dy),
       );
+    },
+  );
+
+  testWidgets(
+    'a stored media file sends the session and a remote url does not',
+    (tester) async {
+      const media = 'http://test/media/keep.jpg';
+      final client = FakeFeedClient([
+        _card(
+          id: 'm',
+          title: '旧图',
+          category: '科技',
+          images: const [media],
+          body: '![图](https://1.1.1.1/a.jpg)',
+        ),
+      ]);
+      await tester.pumpWidget(
+        ProclanApp(locale: const Locale('zh'), client: client, pollEvery: null),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<CachedNetworkImage>(find.byType(CachedNetworkImage))
+            .httpHeaders,
+        {'Authorization': 'Bearer session'},
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: DetailPage(card: client.cards.first, client: client),
+        ),
+      );
+      await tester.pump();
+      final images = tester
+          .widgetList<CachedNetworkImage>(find.byType(CachedNetworkImage))
+          .toList();
+      expect(images.map((image) => image.imageUrl), [
+        media,
+        'https://1.1.1.1/a.jpg',
+      ]);
+      expect(images.map((image) => image.httpHeaders), [
+        {'Authorization': 'Bearer session'},
+        null,
+      ]);
     },
   );
 
@@ -392,9 +456,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No cards yet'), findsOneWidget);
     expect(
-      Theme.of(
-        tester.element(find.text('No cards yet')),
-      ).scaffoldBackgroundColor,
+      Theme.of(tester.element(find.text('No cards yet')))
+          .scaffoldBackgroundColor,
       const Color(0xFFF4F4F5),
     );
     expect(prefs.getString(ThemeController.key), isNull);
@@ -831,11 +894,7 @@ class _MeClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (request.method == 'GET' && request.url.path == '/v1/me') {
       return http.StreamedResponse(
-        Stream.value(
-          utf8.encode(
-            '{"id":"u","username":"林间"}',
-          ),
-        ),
+        Stream.value(utf8.encode('{"id":"u","username":"林间"}')),
         200,
         headers: {'content-type': 'application/json'},
       );

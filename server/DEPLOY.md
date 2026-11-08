@@ -4,7 +4,7 @@ English | [中文](DEPLOY.zh.md)
 
 Deploy the Proclan server on a Linux machine the person owns, with an HTTPS reverse proxy in front. Do not install it on an agent's cloud computer. The server does not issue certificates and does not serve TLS itself.
 
-There is no global ingest token. The feed, delete, and images use the session from login. `/mcp` uses that person's own bot token, copied from the app. The two credentials are not interchangeable: the session token is for the feed and images; the bot token is for MCP.
+There is no global ingest token. The feed and delete use the session from login. An image already stored under `/media` uses that session too. `/mcp` uses that person's own bot token, copied from the app. The two credentials are not interchangeable: the session token is for the feed and those stored images; the bot token is for MCP.
 
 This is the only install procedure. [../README.md](../README.md) is the index for an AI agent. Do not copy these commands into another doc.
 
@@ -15,7 +15,6 @@ Minimum to start server installation:
 - A Linux server the person owns, with root access and a public address.
 - A domain that already resolves to that machine.
 - Caddy or Nginx. For Nginx, also the certificate file paths.
-- Outbound access to the public internet. The server downloads card images itself. The client does not upload them.
 
 Flutter / app packaging can be deferred. If the agent cannot reach the Flutter machine now, install the server first, report the https origin to the person, and leave `API_BASE` for them to set later.
 
@@ -83,16 +82,16 @@ Optional variables:
 | `PROCLAN_DATA_DIR` | Database and image directory. Default `server/data`. Use an absolute path |
 | `FORWARDED_ALLOW_IPS` | Proxy addresses allowed to rewrite the scheme. Default `127.0.0.1,::1` |
 
-**Troubleshooting image URLs**: If image URLs look like `http://127.0.0.1:8787/media/...` instead of `https://<domain>/media/...`, the proxy is not setting `Host` and `X-Forwarded-Proto` correctly, or its address is not in `FORWARDED_ALLOW_IPS`. Fix the proxy headers or add its address to `FORWARDED_ALLOW_IPS`.
+**Troubleshooting image URLs**: Images already stored on disk are served from `/media`. If those URLs look like `http://127.0.0.1:8787/media/...` instead of `https://<domain>/media/...`, the proxy is not setting `Host` and `X-Forwarded-Proto` correctly, or its address is not in `FORWARDED_ALLOW_IPS`. Fix the proxy headers or add its address to `FORWARDED_ALLOW_IPS`. A new card's images are the submitted URLs and do not use these headers.
 
 ### Data directory
 
 Data lives in `PROCLAN_DATA_DIR`:
 
 - `proclan.sqlite3` holds the cards
-- `media/` holds downloaded images
+- `media/` holds image files that older cards still reference
 
-The directory grows with the cards. Do not delete a `media/` directory that is in use, or the pictures in articles disappear.
+New cards store the submitted URL and do not add files. The directory shrinks as those cards expire or are deleted. Do not delete a file that a card still uses, or that picture disappears.
 
 ## Accounts
 
@@ -107,20 +106,13 @@ ASCII case is ignored in the lookup. The command stores an argon2id hash, delete
 
 ## HTTPS
 
-When the proxy and this server are on the same machine, leave `FORWARDED_ALLOW_IPS` at its default. The proxy must put the original host in `Host` and set `X-Forwarded-Proto` to `https`. Image URLs are built from those two values. If the proxy is not trusted, or omits either value, image URLs become `http://127.0.0.1:8787/media/...` and the app on a phone cannot open them.
-
-One submit carries at most 8 cards, and each card at most 6 images. Each image download is capped at 15 seconds. Set the proxy read timeout to at least 180 seconds. Raise it when many images come from a slow origin.
+When the proxy and this server are on the same machine, leave `FORWARDED_ALLOW_IPS` at its default. The proxy must put the original host in `Host` and set `X-Forwarded-Proto` to `https`. The server builds `/media` URLs for image files already on disk from those two values. If the proxy is not trusted, or omits either value, those URLs become `http://127.0.0.1:8787/media/...` and the app on a phone cannot open them. A new card's images are the submitted URLs and do not use these headers.
 
 ### Caddy
 
 ```caddy
 proclan.example.com {
-    reverse_proxy 127.0.0.1:8787 {
-        transport http {
-            response_header_timeout 180s
-            read_timeout 180s
-        }
-    }
+    reverse_proxy 127.0.0.1:8787
 }
 ```
 
@@ -144,7 +136,6 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_read_timeout 180s;
     }
 }
 ```
@@ -255,7 +246,7 @@ When writing cards, list the tools and read the live `submit_cards` inputSchema.
 
 On the computer that runs the app, set `API_BASE` to this https origin and follow [../app/README.md](../app/README.md). Do not compile the app on the server. Do not write the origin into source.
 
-The feed, delete, and article images send the login session, not the bot token. Image URLs must look like `https://proclan.example.com/media/...`.
+The feed and delete send the login session, not the bot token. An image already stored under `/media` sends that session too. A new card's images are the submitted http(s) URLs, and those requests do not send the session.
 
 ## MCP connection
 

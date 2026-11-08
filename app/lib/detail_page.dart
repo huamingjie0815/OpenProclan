@@ -305,7 +305,7 @@ class _DetailPageState extends State<DetailPage> {
                           for (final url in card.images)
                             _Figure(
                               url: url,
-                              headers: widget.client.imageHeaders,
+                              headers: widget.client.imageHeadersFor(url),
                               maxHeight: wide ? 460 : 440,
                             ),
                           Padding(
@@ -367,7 +367,8 @@ class _DetailPageState extends State<DetailPage> {
                                         ),
                                         child: _Figure(
                                           url: uri.toString(),
-                                          headers: widget.client.imageHeaders,
+                                          headers: widget.client
+                                              .imageHeadersFor(uri.toString()),
                                           maxHeight: wide ? 460 : 440,
                                         ),
                                       );
@@ -674,7 +675,6 @@ class _DangerButton extends StatelessWidget {
 }
 
 class _HairlineBuilder extends MarkdownElementBuilder {
-
   @override
   Widget visitElementAfterWithContext(
     BuildContext context,
@@ -731,10 +731,11 @@ MarkdownStyleSheet _articleSheet(bool wide) {
     blockquoteDecoration: BoxDecoration(
       border: Border(left: BorderSide(color: Red.lineStrong, width: 2)),
     ),
-    code: Red.text(size: size * 0.88, height: 1.5, color: Red.fg).copyWith(
-      fontFamily: 'monospace',
-      backgroundColor: Red.surfaceWarm,
-    ),
+    code: Red.text(
+      size: size * 0.88,
+      height: 1.5,
+      color: Red.fg,
+    ).copyWith(fontFamily: 'monospace', backgroundColor: Red.surfaceWarm),
     codeblockPadding: const EdgeInsets.all(12),
     codeblockDecoration: BoxDecoration(
       color: Red.surfaceWarm,

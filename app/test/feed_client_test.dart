@@ -45,6 +45,24 @@ class _AuthLog extends http.BaseClient {
 }
 
 void main() {
+  test('only this server media urls get the session', () {
+    const base = 'http://127.0.0.1:8787';
+    final client = HttpFeedClient(baseUrl: base, token: 'session');
+
+    expect(client.imageHeadersFor('$base/media/keep.jpg'), {
+      'Authorization': 'Bearer session',
+    });
+    expect(client.imageHeadersFor('https://1.1.1.1/a.jpg'), isEmpty);
+    expect(
+      client.imageHeadersFor('https://other.example/media/keep.jpg'),
+      isEmpty,
+    );
+    expect(client.imageHeadersFor('$base/v1/feed'), isEmpty);
+
+    client.token = '';
+    expect(client.imageHeadersFor('$base/media/keep.jpg'), isEmpty);
+  });
+
   test('requests use the current token', () async {
     final auths = <String?>[];
     final client = HttpFeedClient(

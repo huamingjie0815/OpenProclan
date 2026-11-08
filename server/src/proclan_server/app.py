@@ -273,6 +273,8 @@ def _expire(store: Store, settings: Settings) -> None:
 
 
 def _unlink(settings: Settings, name: str) -> None:
+    if name.startswith(("http://", "https://")):
+        return
     path = settings.media_dir / name
     if path.is_file() and path.parent == settings.media_dir:
         path.unlink()
@@ -304,6 +306,12 @@ def _settings_json(user: User) -> dict:
     }
 
 
+def _image_url(name: str, base: str) -> str:
+    if name.startswith(("http://", "https://")):
+        return name
+    return f"{base}/media/{name}"
+
+
 def _card_json(card: Card, request: Request) -> dict:
     base = str(request.base_url).rstrip("/")
     return {
@@ -313,7 +321,7 @@ def _card_json(card: Card, request: Request) -> dict:
         "body": card.body,
         "category": card.category,
         "tags": card.tags,
-        "images": [f"{base}/media/{name}" for name in card.images],
+        "images": [_image_url(name, base) for name in card.images],
         "source": card.source,
         "source_urls": card.source_urls,
         "created_bot": card.created_bot,

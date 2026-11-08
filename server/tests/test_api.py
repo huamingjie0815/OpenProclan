@@ -10,7 +10,7 @@ from proclan_server.categories import CATEGORIES
 from proclan_server.config import Settings
 from proclan_server.publish import CardIn, CardRejected, publish_cards
 from proclan_server.set_password import main as set_password_main
-from proclan_server.store import Store
+from proclan_server.store import Card, Store, new_id, now
 
 
 def settings(tmp_path: Path, **overrides) -> Settings:
@@ -372,27 +372,68 @@ def test_existing_bot_names_gain_description(tmp_path: Path):
     assert "bot_desc" in columns
 
 
-async def test_delete_removes_unused_image(api, monkeypatch: pytest.MonkeyPatch):
+async def test_publish_keeps_public_image_urls(api):
+    client, app = api
+    account = await _register(client)
+    media = app.state.settings.media_dir
+    ids = publish_cards(
+        app.state.store,
+        media,
+        [
+            card(
+                image_urls=[
+                    "https://1.1.1.1/keep.jpg",
+                    "http://127.0.0.1/secret.jpg",
+                    "https://1.1.1.1/keep.jpg",
+                    "https://1.1.1.1/second.jpg",
+                ]
+            )
+        ],
+        user_id=account["user"]["id"],
+    )
+    headers = _auth(account["token"])
+    one = (await client.get(f"/v1/feed/{ids[0]}", headers=headers)).json()
+    assert one["images"] == [
+        "https://1.1.1.1/keep.jpg",
+        "https://1.1.1.1/second.jpg",
+    ]
+    assert list(media.iterdir()) == []
+
+
+async def test_delete_removes_unused_image(api):
     client, app = api
     account = await _register(client)
     media = app.state.settings.media_dir
     (media / "keep.jpg").write_bytes(b"img")
-
-    def fake(url: str, media_dir: Path, *, client=None):
-        return "keep.jpg", False
-
-    monkeypatch.setattr("proclan_server.publish.download_image", fake)
-    ids = publish_cards(
-        app.state.store,
-        media,
-        [card(image_urls=["https://1.1.1.1/keep.jpg"])],
-        user_id=account["user"]["id"],
+    card_id = new_id()
+    app.state.store.insert_cards(
+        [
+            Card(
+                id=card_id,
+                message_id="",
+                title="旧图",
+                summary="",
+                body="",
+                category="科技",
+                tags=[],
+                images=["keep.jpg"],
+                source="",
+                source_urls=[],
+                created_bot="Proclan",
+                processor="",
+                is_read=False,
+                created_at=now().isoformat(),
+                user_id=account["user"]["id"],
+            )
+        ]
     )
     headers = _auth(account["token"])
+    one = (await client.get(f"/v1/feed/{card_id}", headers=headers)).json()
+    assert one["images"] == ["http://test/media/keep.jpg"]
     assert (await client.get("/media/keep.jpg", headers=headers)).status_code == 200
-    deleted = await client.delete(f"/v1/feed/{ids[0]}", headers=headers)
+    deleted = await client.delete(f"/v1/feed/{card_id}", headers=headers)
     assert deleted.status_code == 204
-    assert (await client.get(f"/v1/feed/{ids[0]}", headers=headers)).status_code == 404
+    assert (await client.get(f"/v1/feed/{card_id}", headers=headers)).status_code == 404
     assert not (media / "keep.jpg").exists()
     assert (await client.get("/media/keep.jpg", headers=headers)).status_code == 404
 

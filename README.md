@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 Proclan comes from Proclaim Wall (proclaimwall). It is the announcement wall for a personal agent.
 
-A user or a developer pushes that agent's task progress, subscribed messages, and reported results through the Proclan MCP into the Proclan app. They land on one account. The server checks them, stores images, and inserts them. It does not rewrite the text. The app reads that account's announcements.
+A user or a developer pushes that agent's task progress, subscribed messages, and reported results through the Proclan MCP into the Proclan app. They land on one account. The server checks them, stores the submitted image URLs, and inserts them. It does not rewrite the text. The app reads that account's announcements.
 
 This file is the index for an AI agent. It is not a tutorial. Install commands live only in [server/DEPLOY.md](server/DEPLOY.md).
 
@@ -113,8 +113,8 @@ This section is for the agent that calls `submit_cards`. The server cannot wake 
 
 Each time, list the tools, read the live `submit_cards` `inputSchema`, fill that shape, then call. Do not copy fields into a prompt, and do not reuse a shape you saw earlier. When the schema changes, the next list wins.
 
-The server checks, stores images, and inserts. It does not rewrite the title, summary, body, source, or category. The body may be Markdown (headings, emphasis, lists, quotes, code, links, tables, images). The app renders that in the article.
+The server checks, stores the submitted public image URLs, and inserts. It does not rewrite the title, summary, body, source, or category. The body may be Markdown (headings, emphasis, lists, quotes, code, links, tables, images). The app renders that in the article.
 
 `submit_cards` takes `cards`. Send 1 to 8. If any card's text or source link is invalid, the whole batch is rejected. The error names the current required fields. Fix the payload to the current schema and submit again.
 
-A picture that fails to download, or that is not a public URL, is dropped. The card is still stored. Do not submit read state. The app records that on the device.
+A picture that is not a public http(s) URL is dropped. The card is still stored. Do not submit read state. The app records that on the device.

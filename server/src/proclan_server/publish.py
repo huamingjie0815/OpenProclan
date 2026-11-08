@@ -6,11 +6,10 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Annotated
 
-import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from proclan_server.categories import CATEGORIES, CategoryName
-from proclan_server.net import _UA, download_image, is_public_url
+from proclan_server.net import is_public_url
 from proclan_server.store import Card, Store, new_id, now
 
 MAX_CARDS = 8
@@ -29,7 +28,7 @@ SUBMIT_CARDS_DOC = """提交已经写好的新闻卡片。填写以本工具当�
 
 一次 1 到 8 张。文本或原文链接不合格时，整批不入库。
 服务不改写标题、摘要、正文、来源或分类。body 可以写 Markdown。
-不要提交已读状态。下载失败或非公网的 image_urls 会丢掉，卡片仍入库。
+不要提交已读状态。非公网或不是 http(s) 的 image_urls 会丢掉，卡片仍入库。
 """
 
 
@@ -66,7 +65,7 @@ class CardIn(BaseModel):
     image_urls: list[str] = Field(
         default_factory=list,
         max_length=_IMAGES,
-        description=f"配图地址。最多 {_IMAGES} 条。下载失败或非公网的图会丢掉，卡片仍入库。",
+        description=f"配图地址。最多 {_IMAGES} 条。非公网或不是 http(s) 的图会丢掉，卡片仍入库。",
     )
     source_urls: list[str] = Field(
         default_factory=list,
@@ -135,42 +134,29 @@ class CardIn(BaseModel):
 
 
 def publish_cards(store: Store, media_dir: Path, cards: list[dict], *, user_id: str) -> list[str]:
+    del media_dir  # kept so callers stay the same; new cards are not written to disk
     ready = _validate(cards)
-    saved: list[tuple[_Ready, list[str]]] = []
-    created: list[str] = []
-    try:
-        with httpx.Client(timeout=httpx.Timeout(15.0), headers={"User-Agent": _UA}) as client:
-            for card in ready:
-                names: list[str] = []
-                for url in card.image_urls:
-                    stored = download_image(url, media_dir, client=client)
-                    if stored is None:
-                        continue
-                    filename, was_new = stored
-                    if was_new:
-                        created.append(filename)
-                    if filename not in names:
-                        names.append(filename)
-                saved.append((card, names))
-        rows = _rows(saved)
-        for row in rows:
-            row.user_id = user_id
-        store.insert_cards(rows)
-        stamped = now().isoformat()
-        for card, row in zip(ready, rows, strict=True):
-            store.remember_bot(
-                user_id,
-                row.created_bot,
-                created_at=stamped,
-                bot_desc=card.bot_desc,
-            )
-    except Exception:
-        for name in created:
-            path = media_dir / name
-            if path.is_file():
-                path.unlink()
-        raise
+    rows = _rows([(card, _public_images(card)) for card in ready])
+    for row in rows:
+        row.user_id = user_id
+    store.insert_cards(rows)
+    stamped = now().isoformat()
+    for card, row in zip(ready, rows, strict=True):
+        store.remember_bot(
+            user_id,
+            row.created_bot,
+            created_at=stamped,
+            bot_desc=card.bot_desc,
+        )
     return [row.id for row in rows]
+
+
+def _public_images(card: CardIn) -> list[str]:
+    kept: list[str] = []
+    for url in card.image_urls:
+        if is_public_url(url) and url not in kept:
+            kept.append(url)
+    return kept
 
 
 def _validate(cards: list[dict]) -> list[CardIn]:

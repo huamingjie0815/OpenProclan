@@ -663,7 +663,7 @@ class _FeedPageState extends State<FeedPage> {
                     first: i == 0,
                     collapsed: _isCollapsed(groups[i].key, groups[i].day),
                     read: _read,
-                    imageHeaders: widget.client.imageHeaders,
+                    imageHeadersFor: widget.client.imageHeadersFor,
                     onToggle: () => _toggleGroup(
                       groups[i].key,
                       _isCollapsed(groups[i].key, groups[i].day),
@@ -916,7 +916,7 @@ class _GroupSection extends StatelessWidget {
     required this.first,
     required this.collapsed,
     required this.read,
-    required this.imageHeaders,
+    required this.imageHeadersFor,
     required this.onToggle,
     required this.onOpen,
   });
@@ -925,7 +925,7 @@ class _GroupSection extends StatelessWidget {
   final bool first;
   final bool collapsed;
   final Set<String> read;
-  final Map<String, String> imageHeaders;
+  final Map<String, String> Function(String url) imageHeadersFor;
   final VoidCallback onToggle;
   final ValueChanged<FeedCard> onOpen;
 
@@ -995,7 +995,7 @@ class _GroupSection extends StatelessWidget {
             _Card(
               card: group.items[i],
               read: read.contains(group.items[i].id),
-              imageHeaders: imageHeaders,
+              imageHeadersFor: imageHeadersFor,
               onTap: () => onOpen(group.items[i]),
             ),
           ],
@@ -1008,13 +1008,13 @@ class _Card extends StatefulWidget {
   const _Card({
     required this.card,
     required this.read,
-    required this.imageHeaders,
+    required this.imageHeadersFor,
     required this.onTap,
   });
 
   final FeedCard card;
   final bool read;
-  final Map<String, String> imageHeaders;
+  final Map<String, String> Function(String url) imageHeadersFor;
   final VoidCallback onTap;
 
   @override
@@ -1042,6 +1042,9 @@ class _CardState extends State<_Card> {
     final minutes = readingMinutes('${card.title}${card.summary}${card.body}');
     final mark = sourceMark(card.source);
     final image = card.images.isEmpty ? null : card.images.first;
+    final imageHeaders = image == null
+        ? const <String, String>{}
+        : widget.imageHeadersFor(image);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -1186,9 +1189,9 @@ class _CardState extends State<_Card> {
                           height: thumb,
                           child: CachedNetworkImage(
                             imageUrl: image,
-                            httpHeaders: widget.imageHeaders.isEmpty
+                            httpHeaders: imageHeaders.isEmpty
                                 ? null
-                                : widget.imageHeaders,
+                                : imageHeaders,
                             fit: BoxFit.cover,
                             fadeInDuration: Duration.zero,
                             fadeOutDuration: Duration.zero,
