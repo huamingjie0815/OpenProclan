@@ -1,0 +1,73 @@
+{
+  "workers": 2,
+  "tests": [
+    {
+      "name": "读取吞吐量",
+      "passed": true,
+      "message": "106.0 req/s, P50=47.7ms, P99=52.7ms",
+      "details": {
+        "success": 318,
+        "errors": 0,
+        "rps": 106.0,
+        "p50_ms": 47.74553299989748,
+        "p99_ms": 52.70066099990345,
+        "concurrency": 5,
+        "duration": 3
+      }
+    },
+    {
+      "name": "写入吞吐量",
+      "passed": true,
+      "message": "49.0 req/s, P50=48.2ms, P99=68.2ms, 限流=35",
+      "details": {
+        "success": 147,
+        "rate_limited": 35,
+        "errors": 0,
+        "rps": 49.0,
+        "p50_ms": 48.19889000009425,
+        "p99_ms": 68.24287699998877,
+        "concurrency": 3,
+        "duration": 3
+      }
+    },
+    {
+      "name": "写入验证",
+      "passed": true,
+      "message": "写入一致，成功响应=10, 实际入库=10",
+      "details": {
+        "success": 10,
+        "actual": 10
+      }
+    },
+    {
+      "name": "限流边界验证",
+      "passed": true,
+      "message": "限流生效，成功=49（允许恢复配额）, 限流=6, 入库=49",
+      "details": {
+        "success": 49,
+        "limited": 6,
+        "db_count": 49,
+        "note": "顺序发送允许少量配额恢复"
+      }
+    },
+    {
+      "name": "并发突发限流",
+      "passed": true,
+      "message": "并发限流正确，成功=48, 限流=12, 入库=48",
+      "details": {
+        "success": 48,
+        "limited": 12,
+        "db_count": 48
+      }
+    },
+    {
+      "name": "bot 名称限流",
+      "passed": true,
+      "message": "新名字限流正确，成功=8, 限流=4",
+      "details": {
+        "success": 8,
+        "limited": 4
+      }
+    }
+  ]
+}
