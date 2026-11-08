@@ -70,6 +70,10 @@ class FeedCard {
   }
 }
 
+/// Wikimedia and similar hosts refuse the default Dart user agent.
+const imageUserAgent =
+    'Proclan (https://github.com/huamingjie0815/OpenProclan)';
+
 class FeedException implements Exception {
   const FeedException(this.code);
   final String code;
@@ -107,10 +111,11 @@ class HttpFeedClient implements FeedClient {
 
   @override
   Map<String, String> imageHeadersFor(String url) {
-    if (token.isEmpty || !url.startsWith('$baseUrl/media/')) {
-      return const {};
+    final headers = <String, String>{'User-Agent': imageUserAgent};
+    if (token.isNotEmpty && url.startsWith('$baseUrl/media/')) {
+      headers.addAll(_headers);
     }
-    return _headers;
+    return headers;
   }
 
   @override

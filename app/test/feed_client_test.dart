@@ -51,16 +51,22 @@ void main() {
 
     expect(client.imageHeadersFor('$base/media/keep.jpg'), {
       'Authorization': 'Bearer session',
+      'User-Agent': imageUserAgent,
     });
-    expect(client.imageHeadersFor('https://1.1.1.1/a.jpg'), isEmpty);
-    expect(
-      client.imageHeadersFor('https://other.example/media/keep.jpg'),
-      isEmpty,
-    );
-    expect(client.imageHeadersFor('$base/v1/feed'), isEmpty);
+    expect(client.imageHeadersFor('https://1.1.1.1/a.jpg'), {
+      'User-Agent': imageUserAgent,
+    });
+    expect(client.imageHeadersFor('https://other.example/media/keep.jpg'), {
+      'User-Agent': imageUserAgent,
+    });
+    expect(client.imageHeadersFor('$base/v1/feed'), {
+      'User-Agent': imageUserAgent,
+    });
 
     client.token = '';
-    expect(client.imageHeadersFor('$base/media/keep.jpg'), isEmpty);
+    expect(client.imageHeadersFor('$base/media/keep.jpg'), {
+      'User-Agent': imageUserAgent,
+    });
   });
 
   test('requests use the current token', () async {
