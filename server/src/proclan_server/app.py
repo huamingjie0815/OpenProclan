@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
 from typing import Annotated
 
@@ -25,33 +27,80 @@ from proclan_server.categories import CATEGORIES
 from proclan_server.config import Settings, load_settings
 from proclan_server.hashing import new_secret
 from proclan_server.identity import current_user_id
-from proclan_server.publish import MAX_CARDS, SUBMIT_CARDS_DOC, CardIn, CardRejected, publish_cards
+from proclan_server.limits import (
+    BodyLimit,
+    DatabaseBusy,
+    Inflight,
+    NameCap,
+    RateLimited,
+    mark_limited,
+    rate_limit_flag,
+)
+from proclan_server.publish import (
+    MAX_CARDS,
+    CardIn,
+    CardRejected,
+    cards_field_doc,
+    publish_cards,
+    submit_cards_doc,
+)
 from proclan_server.store import Card, Store, User, now
+
+log = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     store = Store(settings.db_path)
     mcp = FastMCP("Proclan")
+    limit_text = cards_field_doc(
+        settings.bot_burst,
+        settings.bot_refill_seconds,
+        name_burst=settings.bot_name_burst,
+        name_refill_seconds=settings.bot_name_refill_seconds,
+        name_cap=settings.bot_name_cap,
+    )
 
-    @mcp.tool(description=SUBMIT_CARDS_DOC)
-    async def submit_cards(
-        cards: Annotated[list[CardIn], Field(min_length=1, max_length=MAX_CARDS)],
-    ) -> dict:
+    async def submit_cards(cards) -> dict:
         user_id = current_user_id.get()
         if not user_id:
             raise ToolError("invalid token")
         try:
-            ids = publish_cards(
+            ids = await asyncio.to_thread(
+                _publish,
                 store,
-                settings.media_dir,
+                settings,
                 [card.model_dump() for card in cards],
-                user_id=user_id,
+                user_id,
             )
         except CardRejected as exc:
             raise ToolError(exc.detail) from exc
-        _expire(store, settings)
+        except NameCap as exc:
+            raise ToolError(exc.detail) from exc
+        except RateLimited as exc:
+            mark_limited()
+            raise ToolError(exc.detail) from exc
+        except DatabaseBusy as exc:
+            mark_limited()
+            raise ToolError("请稍后再试。") from exc
         return {"card_ids": ids}
+
+    submit_cards.__annotations__ = {
+        "cards": Annotated[
+            list[CardIn],
+            Field(min_length=1, max_length=MAX_CARDS, description=limit_text),
+        ],
+        "return": dict,
+    }
+    mcp.tool(
+        description=submit_cards_doc(
+            settings.bot_burst,
+            settings.bot_refill_seconds,
+            name_burst=settings.bot_name_burst,
+            name_refill_seconds=settings.bot_name_refill_seconds,
+            name_cap=settings.bot_name_cap,
+        )
+    )(submit_cards)
 
     mcp_app = mcp.http_app(path="/", stateless_http=True, json_response=True)
     settings.media_dir.mkdir(parents=True, exist_ok=True)
@@ -61,14 +110,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         app.state.settings = settings
         app.state.store = store
-        async with mcp_app.lifespan(app):
-            yield
+        task = asyncio.create_task(_prune_loop(store, settings))
+        try:
+            async with mcp_app.lifespan(app):
+                yield
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
     app = FastAPI(title="Proclan", lifespan=lifespan)
     app.state.settings = settings
     app.state.store = store
     app.state.mcp = mcp
     app.mount("/mcp", mcp_app)
+    app.state.mcp_inflight = Inflight(settings.mcp_inflight)
 
     @app.post("/v1/auth/register")
     def auth_register(body: _Register) -> dict:
@@ -140,12 +196,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/v1/bots/profile")
     def bot_profile(request: Request, name: str) -> dict:
-        _expire(store, settings)
         found = store.get_bot(request.state.user_id, name)
         if found is None:
             raise HTTPException(404, "bot not found")
         bot_name, first_seen, bot_desc = found
-        cards = store.cards_for_bot(request.state.user_id, bot_name)
+        cards = store.cards_for_bot(
+            request.state.user_id,
+            bot_name,
+            not_before=_cutoff(settings),
+        )
         return {
             "name": bot_name,
             "first_seen": first_seen,
@@ -168,19 +227,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(400, "unknown category")
         limit = min(max(limit, 1), 100)
         offset = max(offset, 0)
-        _expire(store, settings)
         cards = store.list_cards(
             category=category,
             limit=limit,
             offset=offset,
             user_id=request.state.user_id,
+            not_before=_cutoff(settings),
         )
         return {"cards": [_card_json(card, request) for card in cards]}
 
     @app.get("/v1/feed/{card_id}")
     def feed_one(card_id: str, request: Request) -> dict:
-        _expire(store, settings)
-        card = store.get_card(card_id, user_id=request.state.user_id)
+        card = store.get_card(card_id, user_id=request.state.user_id, not_before=_cutoff(settings))
         if card is None:
             raise HTTPException(404, "card not found")
         return _card_json(card, request)
@@ -210,7 +268,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if kind is None:
             return await call_next(request)
         presented = _bearer(request)
-        user_id = _user_for(store, presented, kind)
+        try:
+            user_id = await asyncio.to_thread(_user_for, store, presented, kind)
+        except DatabaseBusy:
+            return _retry()
         if user_id is None:
             return JSONResponse({"detail": "invalid token"}, status_code=401)
         request.state.user_id = user_id
@@ -221,7 +282,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             current_user_id.reset(token)
 
+    @app.middleware("http")
+    async def guard(request: Request, call_next):
+        limited = {"hit": False}
+        flag = rate_limit_flag.set(limited)
+        entered = False
+        try:
+            path = request.url.path
+            if path.startswith("/mcp"):
+                if not app.state.mcp_inflight.try_enter():
+                    return _retry()
+                entered = True
+            try:
+                response = await call_next(request)
+            except DatabaseBusy:
+                return _retry()
+            if limited["hit"]:
+                return _retry()
+            return response
+        finally:
+            rate_limit_flag.reset(flag)
+            if entered:
+                app.state.mcp_inflight.leave()
+
+    @app.exception_handler(DatabaseBusy)
+    async def database_busy(_request: Request, _exc: DatabaseBusy) -> JSONResponse:
+        return _retry()
+
     app.add_middleware(_MCPPath)
+    app.add_middleware(BodyLimit, max_bytes=settings.body_bytes)
     return app
 
 
@@ -266,9 +355,45 @@ def _user_for(store: Store, token: str, kind: str) -> str | None:
     return store.user_id_for_session(token, now=now().isoformat())
 
 
-def _expire(store: Store, settings: Settings) -> None:
-    cutoff = (now() - timedelta(hours=settings.message_ttl_hours)).isoformat()
-    for name in store.prune(before=cutoff):
+def _publish(store: Store, settings: Settings, cards: list[dict], user_id: str) -> list[str]:
+    return publish_cards(
+        store,
+        settings.media_dir,
+        cards,
+        user_id=user_id,
+        burst=settings.bot_burst,
+        refill_seconds=settings.bot_refill_seconds,
+        name_cap=settings.bot_name_cap,
+        name_burst=settings.bot_name_burst,
+        name_refill_seconds=settings.bot_name_refill_seconds,
+    )
+
+
+def _cutoff(settings: Settings) -> str:
+    return (now() - timedelta(hours=settings.message_ttl_hours)).isoformat()
+
+
+def _retry() -> JSONResponse:
+    return JSONResponse(
+        {"detail": "retry later"},
+        status_code=429,
+        headers={"Retry-After": "2"},
+    )
+
+
+async def _prune_loop(store: Store, settings: Settings) -> None:
+    while True:
+        try:
+            await asyncio.to_thread(_prune_once, store, settings)
+        except Exception:
+            log.exception("prune failed")
+        await asyncio.sleep(60)
+
+
+def _prune_once(store: Store, settings: Settings) -> None:
+    if not store.claim_prune():
+        return
+    for name in store.prune(before=_cutoff(settings)):
         _unlink(settings, name)
 
 
@@ -356,4 +481,11 @@ class _SettingsIn(BaseModel):
 
 def main() -> None:
     settings = load_settings()
-    uvicorn.run(create_app(settings), host=settings.host, port=settings.port)
+    uvicorn.run(
+        "proclan_server.app:create_app",
+        factory=True,
+        host=settings.host,
+        port=settings.port,
+        workers=settings.workers,
+        limit_concurrency=settings.limit_concurrency,
+    )

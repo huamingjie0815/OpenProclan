@@ -10,10 +10,11 @@ from fastmcp import Client, FastMCP
 from fastmcp.client.auth import BearerAuth
 from pydantic import Field
 
-from proclan_server.config import SERVER_ROOT
-from proclan_server.publish import MAX_CARDS, SUBMIT_CARDS_DOC, CardIn
+from proclan_server.config import SERVER_ROOT, load_settings
+from proclan_server.publish import MAX_CARDS, CardIn, cards_field_doc, submit_cards_doc
 
 load_dotenv(SERVER_ROOT / ".env", override=False)
+_settings = load_settings()
 
 mcp = FastMCP("Proclan")
 
@@ -26,9 +27,30 @@ def _base_url() -> str:
     return f"http://{host}:{port}"
 
 
-@mcp.tool(description=SUBMIT_CARDS_DOC)
+@mcp.tool(
+    description=submit_cards_doc(
+        _settings.bot_burst,
+        _settings.bot_refill_seconds,
+        name_burst=_settings.bot_name_burst,
+        name_refill_seconds=_settings.bot_name_refill_seconds,
+        name_cap=_settings.bot_name_cap,
+    )
+)
 async def submit_cards(
-    cards: Annotated[list[CardIn], Field(min_length=1, max_length=MAX_CARDS)],
+    cards: Annotated[
+        list[CardIn],
+        Field(
+            min_length=1,
+            max_length=MAX_CARDS,
+            description=cards_field_doc(
+                _settings.bot_burst,
+                _settings.bot_refill_seconds,
+                name_burst=_settings.bot_name_burst,
+                name_refill_seconds=_settings.bot_name_refill_seconds,
+                name_cap=_settings.bot_name_cap,
+            ),
+        ),
+    ],
 ) -> dict:
     token = os.environ.get("BOT_TOKEN", "").strip()
     auth = BearerAuth(token) if token else None

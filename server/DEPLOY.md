@@ -176,9 +176,15 @@ server {
 
 The exact-match `location = /` serves the landing page. All other paths go to the app.
 
-## One process
+## Workers
 
-Run one process. Do not set `WEB_CONCURRENCY`, and do not add workers. The write lock is inside the process.
+The server runs two worker processes by default. Set `PROCLAN_WORKERS` to change that. Do not set `WEB_CONCURRENCY`. The database stays one `proclan.sqlite3` file in WAL mode. A write takes one short immediate transaction. A write that is still waiting after 5 seconds returns 429 `retry later`.
+
+Each bot can land 48 cards at once, then one more card every 2 seconds. `PROCLAN_BOT_BURST` and `PROCLAN_BOT_REFILL_SECONDS` change those numbers. The `submit_cards` description shows the numbers in use. A bot over that limit gets 429 `retry later`. A request body over 1 MiB gets 413 `payload too large`.
+
+An account keeps at most 32 bot names. It can add 8 new names at once, then one more name every 60 seconds. Adding names faster than that returns 429 `retry later`. At 32 names the tool says to delete an unused name first. The `submit_cards` description shows these numbers too.
+
+The worker count comes from the environment, not from the unit.
 
 The unit below assumes the clone path above. `HOST` and `PORT` are already in `.env`. Do not put a token in the unit.
 
