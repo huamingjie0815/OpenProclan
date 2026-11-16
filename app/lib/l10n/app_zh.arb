@@ -81,6 +81,8 @@
   "delete": "删除",
   "deleted": "卡片已删除",
   "deleteFailed": "没有删掉，请再试一次",
+  "share": "分享",
+  "shareFailed": "没能打开分享",
   "sourceNote": "已收录到你的日报",
   "openOriginal": "打开原文",
   "preferences": "偏好设置",

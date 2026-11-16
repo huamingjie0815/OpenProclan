@@ -518,6 +518,18 @@ abstract class AppLocalizations {
   /// **'没有删掉，请再试一次'**
   String get deleteFailed;
 
+  /// No description provided for @share.
+  ///
+  /// In zh, this message translates to:
+  /// **'分享'**
+  String get share;
+
+  /// No description provided for @shareFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'没能打开分享'**
+  String get shareFailed;
+
   /// No description provided for @sourceNote.
   ///
   /// In zh, this message translates to:

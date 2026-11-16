@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'chrome.dart';
@@ -10,6 +11,31 @@ import 'l10n/app_localizations.dart';
 import 'red.dart';
 
 enum DetailResult { deleted, markedUnread }
+
+/// Title, summary, body, source, and source links.
+/// Image URLs stay out: `/media` needs the session and expires with the card.
+String cardShareText(FeedCard card) {
+  final parts = <String>[];
+  void add(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isNotEmpty) {
+      parts.add(trimmed);
+    }
+  }
+
+  add(card.title);
+  add(card.summary);
+  add(card.body);
+  add(card.source);
+  final urls = [
+    for (final url in card.sourceUrls)
+      if (url.trim().isNotEmpty) url.trim(),
+  ];
+  if (urls.isNotEmpty) {
+    parts.add(urls.join('\n'));
+  }
+  return parts.join('\n\n');
+}
 
 Future<DetailResult?> openCardDetail(
   BuildContext context, {
@@ -174,6 +200,32 @@ class _DetailPageState extends State<DetailPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _share(BuildContext anchor) async {
+    final card = widget.card;
+    final text = cardShareText(card);
+    if (text.isEmpty) {
+      return;
+    }
+    final box = anchor.findRenderObject();
+    final origin = box is RenderBox && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    final title = card.title.trim();
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: text,
+          subject: title.isEmpty ? null : title,
+          sharePositionOrigin: origin,
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).shareFailed);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
@@ -241,6 +293,7 @@ class _DetailPageState extends State<DetailPage> {
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
                                   style: Red.text(
                                     size: 12,
                                     color: Red.fg2,
@@ -248,6 +301,20 @@ class _DetailPageState extends State<DetailPage> {
                                     tabular: true,
                                   ),
                                 ),
+                              ),
+                              Builder(
+                                builder: (context) {
+                                  return IconButton(
+                                    key: const Key('detail-share'),
+                                    tooltip: l.share,
+                                    onPressed: () => _share(context),
+                                    icon: const Icon(Icons.ios_share, size: 18),
+                                    style: IconButton.styleFrom(
+                                      foregroundColor: Red.fg2,
+                                      fixedSize: const Size(44, 44),
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),

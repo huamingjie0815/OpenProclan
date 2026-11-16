@@ -242,6 +242,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteFailed => '没有删掉，请再试一次';
 
   @override
+  String get share => '分享';
+
+  @override
+  String get shareFailed => '没能打开分享';
+
+  @override
   String get sourceNote => '已收录到你的日报';
 
   @override

@@ -824,6 +824,10 @@ void main() {
       tester.widget<IconButton>(find.byKey(const Key('detail-back'))).tooltip,
       '返回',
     );
+    expect(
+      tester.widget<IconButton>(find.byKey(const Key('detail-share'))).tooltip,
+      '分享',
+    );
 
     await tester.tap(find.byKey(const Key('detail-back')));
     await tester.pumpAndSettle();

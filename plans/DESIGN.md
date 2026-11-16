@@ -57,7 +57,7 @@ Categories are a row of outlined chips. The selected chip fills with the accent.
 
 ## Article
 
-The top bar sticks. Back is on the left. Category and time are in the center. A reading progress line runs along the bottom edge. The body sits in an outlined card: image, title, summary, body, tags, source. Mark unread is an outlined button. Delete is a danger outline. The confirm button in the dialog is red with white text. The hero image is clipped to an 8px radius. The body renders Markdown.
+The top bar sticks. Back is on the left. Category and time are in the center. Share is on the right. It hands the title, summary, body, source, and source links to the system share sheet. The other app receives that text. It is not a link back to the card. A reading progress line runs along the bottom edge. The body sits in an outlined card: image, title, summary, body, tags, source. Mark unread is an outlined button. Delete is a danger outline. The confirm button in the dialog is red with white text. The hero image is clipped to an 8px radius. The body renders Markdown.
 
 ## Settings
 

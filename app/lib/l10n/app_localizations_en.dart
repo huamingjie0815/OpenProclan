@@ -247,6 +247,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteFailed => 'Couldn\'t delete it. Try again.';
 
   @override
+  String get share => 'Share';
+
+  @override
+  String get shareFailed => 'Could not open the share sheet.';
+
+  @override
   String get sourceNote => 'Saved to your daily';
 
   @override

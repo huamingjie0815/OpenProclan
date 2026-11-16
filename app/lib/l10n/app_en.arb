@@ -70,6 +70,8 @@
   "delete": "Delete",
   "deleted": "Card deleted",
   "deleteFailed": "Couldn't delete it. Try again.",
+  "share": "Share",
+  "shareFailed": "Could not open the share sheet.",
   "sourceNote": "Saved to your daily",
   "openOriginal": "Open source",
   "preferences": "Preferences",
