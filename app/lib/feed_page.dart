@@ -559,7 +559,6 @@ class _FeedPageState extends State<FeedPage> {
       account: widget.account,
       onLogout: widget.onLogout,
       onSecurity: () => _openAccount(AccountOpen.security),
-      onPrivacy: () => _openAccount(AccountOpen.privacy),
     );
   }
 

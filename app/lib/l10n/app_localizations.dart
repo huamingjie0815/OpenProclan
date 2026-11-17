@@ -884,30 +884,6 @@ abstract class AppLocalizations {
   /// **'token 已轮换'**
   String get rotated;
 
-  /// No description provided for @privacy.
-  ///
-  /// In zh, this message translates to:
-  /// **'隐私'**
-  String get privacy;
-
-  /// No description provided for @privacySub.
-  ///
-  /// In zh, this message translates to:
-  /// **'本地数据与可见范围'**
-  String get privacySub;
-
-  /// No description provided for @privacyEmpty.
-  ///
-  /// In zh, this message translates to:
-  /// **'这里还没有可以调整的项目。'**
-  String get privacyEmpty;
-
-  /// No description provided for @privacyText.
-  ///
-  /// In zh, this message translates to:
-  /// **'你的卡片和已读状态都保存在自己的服务与这台设备上。分享到这台服务器社区的 bot，其他账号可以阅读它最新一张还在的卡片。撤下之后，知道短码的账号仍可以阅读这张最新卡片。'**
-  String get privacyText;
-
   /// No description provided for @community.
   ///
   /// In zh, this message translates to:

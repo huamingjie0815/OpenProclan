@@ -61,7 +61,7 @@ The top bar sticks. Back is on the left. The time is in the center. Share is on 
 
 ## Settings
 
-The feed drawer opens bots directly. Its settings control raises a card from the bottom. The card holds appearance, language, unread only, cache, and auto sync, then account and privacy. Sign out is on that card. It does not list bots. Dark and light apply immediately. Account and privacy open their own pages. Back on those pages returns to the feed. The back tooltip is "Back".
+The feed drawer opens bots directly. Its settings control raises a card from the bottom. The card holds appearance, language, unread only, cache, and auto sync, then account. Sign out is on that card. It does not list bots. Dark and light apply immediately. Account opens its own page. Back on that page returns to the feed. The back tooltip is "Back".
 
 The card cache on this device, including which cards are read, belongs to the signed-in account. Another account on the same device sees only its own cards.
 
@@ -71,7 +71,7 @@ Password is a separate page: current password, then new password. Success signs 
 
 The bot page lists your own names, then the bots you follow, grouped under each owner. A name you own opens its detail. Basics show the first time it appeared and its role, then every push the server still holds. The same page can share that bot to this server's community. The first share creates an 8-character code. The page shows whether it is shared, the code, the like count, and the follower count. Stopping the share asks for confirmation. Opening a followed bot shows the cards copied to you. An offline bot stays in that group and says so. Opening a card and going back returns only to that bot. Deleting the name removes it from the list and stops the share. The cards stay, and so does the code. The next push with the same name adds the name again, with sharing off until it is shared once more. Under the token there is one button, which copies an MCP install prompt. The prompt names no client. The wording follows the UI language. The copy includes the current bot token and this app's server origin. The prompt says to read the live `submit_cards` inputSchema each time and to fill that schema, and not to copy fields into the prompt.
 
-Privacy says the data stays on the person's own server and on this device. It also says that a bot shared to this server's community lets other accounts read the latest card that bot still has, and that an account which knows the code can still read that card after sharing stops. After the feed scrolls past one screen, a control at the lower right returns to the top.
+After the feed scrolls past one screen, a control at the lower right returns to the top.
 
 ## Community
 

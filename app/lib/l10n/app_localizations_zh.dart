@@ -428,19 +428,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get rotated => 'token 已轮换';
 
   @override
-  String get privacy => '隐私';
-
-  @override
-  String get privacySub => '本地数据与可见范围';
-
-  @override
-  String get privacyEmpty => '这里还没有可以调整的项目。';
-
-  @override
-  String get privacyText =>
-      '你的卡片和已读状态都保存在自己的服务与这台设备上。分享到这台服务器社区的 bot，其他账号可以阅读它最新一张还在的卡片。撤下之后，知道短码的账号仍可以阅读这张最新卡片。';
-
-  @override
   String get community => '社区';
 
   @override

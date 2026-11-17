@@ -10,7 +10,7 @@ import 'feed_client.dart';
 import 'l10n/app_localizations.dart';
 import 'red.dart';
 
-enum AccountOpen { bots, security, privacy }
+enum AccountOpen { bots, security }
 
 class AccountPage extends StatefulWidget {
   const AccountPage({
@@ -59,7 +59,6 @@ class _AccountPageState extends State<AccountPage> {
     _screen = switch (widget.open) {
       AccountOpen.bots => _AccountScreen.bots,
       AccountOpen.security => _AccountScreen.security,
-      AccountOpen.privacy => _AccountScreen.privacy,
     };
     _loadAccount();
     _loadFollowing();
@@ -272,7 +271,6 @@ class _AccountPageState extends State<AccountPage> {
   bool get _atRoot => switch (widget.open) {
     AccountOpen.bots => _screen == _AccountScreen.bots,
     AccountOpen.security => _screen == _AccountScreen.security,
-    AccountOpen.privacy => _screen == _AccountScreen.privacy,
   };
 
   void _back() {
@@ -485,7 +483,6 @@ class _AccountPageState extends State<AccountPage> {
       _AccountScreen.password => l.passwordSection,
       _AccountScreen.bots => l.bots,
       _AccountScreen.bot => _botName ?? l.bots,
-      _AccountScreen.privacy => l.privacy,
     };
     return PopScope(
       canPop: _atRoot,
@@ -718,7 +715,6 @@ class _AccountPageState extends State<AccountPage> {
                         onShare: _setShared,
                         onCopyCode: _copyCode,
                       ),
-                    if (_screen == _AccountScreen.privacy) _PrivacyBody(),
                   ],
                 ),
               ),
@@ -755,7 +751,7 @@ String mcpSetupPrompt(
   return '${l.mcpPrompt(url, token)}\n\n$command';
 }
 
-enum _AccountScreen { security, password, bots, bot, privacy }
+enum _AccountScreen { security, password, bots, bot }
 
 class _BotBody extends StatelessWidget {
   const _BotBody({
@@ -1254,53 +1250,6 @@ class _TocRow extends StatelessWidget {
               ),
             ),
             Icon(Icons.chevron_right, size: 16, color: Red.meta),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PrivacyBody extends StatelessWidget {
-  const _PrivacyBody();
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Red.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Red.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 46, 24, 46),
-        child: Column(
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: Red.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Red.border),
-              ),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: Icon(Icons.lock_outline, color: Red.meta),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l.privacyEmpty,
-              textAlign: TextAlign.center,
-              style: Red.text(size: 20, height: 1.3, weight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l.privacyText,
-              textAlign: TextAlign.center,
-              style: Red.text(size: 12, height: 1.7, color: Red.muted),
-            ),
           ],
         ),
       ),
@@ -2000,7 +1949,6 @@ Future<void> showSettingsCard(
   required AccountClient? account,
   required Future<void> Function()? onLogout,
   required VoidCallback onSecurity,
-  required VoidCallback onPrivacy,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -2033,7 +1981,6 @@ Future<void> showSettingsCard(
               account: account,
               onLogout: onLogout,
               onSecurity: onSecurity,
-              onPrivacy: onPrivacy,
             ),
           ),
         ),
@@ -2054,7 +2001,6 @@ class _SettingsCard extends StatefulWidget {
     required this.account,
     required this.onLogout,
     required this.onSecurity,
-    required this.onPrivacy,
   });
 
   final bool unreadOnly;
@@ -2067,7 +2013,6 @@ class _SettingsCard extends StatefulWidget {
   final AccountClient? account;
   final Future<void> Function()? onLogout;
   final VoidCallback onSecurity;
-  final VoidCallback onPrivacy;
 
   @override
   State<_SettingsCard> createState() => _SettingsCardState();
@@ -2322,24 +2267,19 @@ class _SettingsCardState extends State<_SettingsCard> {
                   ),
                 ],
               ),
-              _TocLabel(l.more),
-              _TocCard(
-                children: [
-                  if (signedIn)
+              if (signedIn) ...[
+                _TocLabel(l.more),
+                _TocCard(
+                  children: [
                     _TocRow(
                       icon: Icons.person_outline,
                       title: l.security,
                       subtitle: l.securitySub,
                       onTap: () => _open(widget.onSecurity),
                     ),
-                  _TocRow(
-                    icon: Icons.lock_outline,
-                    title: l.privacy,
-                    subtitle: l.privacySub,
-                    onTap: () => _open(widget.onPrivacy),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               if (widget.onLogout != null) ...[
                 const SizedBox(height: 12),
                 OutlinedButton(
