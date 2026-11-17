@@ -65,7 +65,7 @@ Proclan 出自 Proclaim Wall（proclaimwall）。它是 personal agent 的公告
 - 连接名 `Proclan`。认证是静态请求头 `Authorization: Bearer <对方的 bot token>`，不是 OAuth。token 从应用的 Bot 页复制，不要自己生成，不要写进 `app/.env`
 - 数据库文件名 `proclan.sqlite3`
 
-没有全局接入 token。应用编译只需要 `API_BASE`。bot token 只放在这个人的 MCP 连接请求头里。不要写进仓库、提交、提示词、routine 或技能。不要提交 `app/.env` 和 `server/.env`。`app/.env.development` 和 `app/.env.production` 只放 `API_BASE`。
+没有全局接入 token。应用编译只需要 `API_BASE`。bot token 只放在这个人的 MCP 连接请求头里。不要写进仓库、提交、提示词、routine 或技能。不要提交 `app/.env`、`app/.env.development`、`app/.env.production` 和 `server/.env`。
 
 只打开 80 和 443。`8787` 留在本机给反代用。
 

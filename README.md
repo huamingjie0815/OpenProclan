@@ -65,7 +65,7 @@ If the public curl fails but loopback `/openapi.json` returns 200 and the proxy 
 - Connection name `Proclan`. Auth is the static header `Authorization: Bearer <the person's bot token>`, not OAuth. Copy the token from the app's bot page. Do not generate one. Do not write it into `app/.env`.
 - Database file name `proclan.sqlite3`
 
-There is no global ingest token. The app build needs `API_BASE` only. The bot token lives only in that person's MCP connection header. Do not write it into the repository, a commit, a prompt, a routine, or a skill. Do not commit `app/.env` or `server/.env`. `app/.env.development` and `app/.env.production` contain only `API_BASE`.
+There is no global ingest token. The app build needs `API_BASE` only. The bot token lives only in that person's MCP connection header. Do not write it into the repository, a commit, a prompt, a routine, or a skill. Do not commit `app/.env`, `app/.env.development`, `app/.env.production`, or `server/.env`.
 
 Open ports 80 and 443 only. Leave `8787` on the machine for the reverse proxy.
 

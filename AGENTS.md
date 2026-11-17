@@ -24,7 +24,7 @@ cd server && uv run pytest
 cd app && flutter test
 ```
 
-`API_BASE` lives in an env file, not in source. `app/.env` is local and is not committed. `app/.env.development` and `app/.env.production` are committed and contain only `API_BASE`. Do not put a session or a bot token in the compile flags. `server/.env` holds the server variables. Do not commit `app/.env` or `server/.env`. Do not write tokens into source, docs, or replies.
+`API_BASE` lives in an env file, not in source. `app/.env`, `app/.env.development`, and `app/.env.production` are local and are not committed. Do not put a session or a bot token in the compile flags. `server/.env` holds the server variables. Do not commit any of these env files. Do not write tokens into source, docs, or replies.
 
 ## Accounts
 
