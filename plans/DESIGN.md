@@ -43,7 +43,7 @@ Column widths: feed 960, article and settings 820. Horizontal padding is 4% of t
 
 On a wide screen, two columns, and the left one is slightly wider. The left pane is the seaside photograph with two darkening layers and the headline "Your feed. Your rules." The right card is vertically centered and starts at the title. The login line is "Sign in to read your own daily." The link is "Create account". Register links back with "Back to sign in".
 
-Both modes ask for a username and a password. Register shows the note "This is your login name. It must be unique, and you can change it later." A narrow screen stacks the photograph above the form. An error is prefixed with a "!" badge. The other locale uses its own strings for the same layout.
+Both modes ask for a username and a password. Register shows the note "This is your login name. It must be unique, and you can change it later." A narrow screen stacks the photograph above the form. An error is prefixed with a "!" badge. The other locale uses its own strings for the same layout. This screen has no language switch. Language follows the system until settings stores a choice.
 
 ## Feed
 
@@ -62,6 +62,8 @@ The top bar sticks. Back is on the left. The time is in the center. Share is on 
 ## Settings
 
 The feed drawer opens bots directly. Its settings control raises a card from the bottom. The card holds appearance, language, unread only, cache, and auto sync, then account and privacy. Sign out is on that card. It does not list bots. Dark and light apply immediately. Account and privacy open their own pages. Back on those pages returns to the feed. The back tooltip is "Back".
+
+The card cache on this device, including which cards are read, belongs to the signed-in account. Another account on the same device sees only its own cards.
 
 Account is a username field and its note: this is the login name, it must be unique, and it can be changed later. Save is a solid button aligned to the right. Saving keeps the session. The new name is the next login name.
 

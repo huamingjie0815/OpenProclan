@@ -70,6 +70,7 @@ class _FeedPageState extends State<FeedPage> {
   Timer? _poll;
   var _loadEpoch = 0;
   String? _username;
+  AccountUser? _knownUser;
 
   @override
   void initState() {
@@ -100,10 +101,13 @@ class _FeedPageState extends State<FeedPage> {
 
   Future<void> _bootstrap() async {
     final prefs = widget.prefs;
-    final inbox = prefs == null ? null : (Inbox(prefs)..load());
+    final userId = await _signedInUserId();
     if (!mounted) {
       return;
     }
+    final inbox = (prefs == null || userId == null)
+        ? null
+        : (Inbox(prefs, userId: userId)..load());
     setState(() {
       _inbox = inbox;
       _unreadOnly = prefs?.getBool(_unreadKey) ?? false;
@@ -117,7 +121,44 @@ class _FeedPageState extends State<FeedPage> {
     await Future.wait([_load(), _syncAccountSettings(), _loadUser()]);
   }
 
+  /// Cards, read marks, and tombstones are stored under the signed-in user.
+  /// The old unscoped blob mixed every account, so it is dropped.
+  Future<String?> _signedInUserId() async {
+    final prefs = widget.prefs;
+    if (prefs == null) {
+      return null;
+    }
+    await prefs.remove(Inbox.legacyKey);
+    final stored = prefs.getString(Inbox.userKey);
+    if (stored != null && stored.isNotEmpty) {
+      return stored;
+    }
+    final account = widget.account;
+    if (account == null) {
+      return null;
+    }
+    try {
+      final user = await account.me();
+      if (user.id.isEmpty) {
+        return null;
+      }
+      _knownUser = user;
+      await prefs.setString(Inbox.userKey, user.id);
+      return user.id;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _loadUser() async {
+    final known = _knownUser;
+    if (known != null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _username = known.username);
+      return;
+    }
     final account = widget.account;
     if (account == null) {
       return;

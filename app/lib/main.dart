@@ -6,6 +6,7 @@ import 'account_api.dart';
 import 'community_api.dart';
 import 'feed_client.dart';
 import 'feed_page.dart';
+import 'inbox.dart';
 import 'l10n/app_localizations.dart';
 import 'login_page.dart';
 import 'red.dart';
@@ -121,12 +122,18 @@ class _AppRootState extends State<AppRoot> {
     community.token = token;
   }
 
-  Future<void> _setToken(String? token) async {
+  Future<void> _setToken(String? token, {String userId = ''}) async {
     if (token == null || token.isEmpty) {
       await widget.prefs.remove(sessionKey);
+      await widget.prefs.remove(Inbox.userKey);
       token = null;
     } else {
       await widget.prefs.setString(sessionKey, token);
+      if (userId.isEmpty) {
+        await widget.prefs.remove(Inbox.userKey);
+      } else {
+        await widget.prefs.setString(Inbox.userKey, userId);
+      }
       _open(token);
     }
     if (!mounted) {
@@ -167,8 +174,7 @@ class _AppRootState extends State<AppRoot> {
         themes: _themes,
         home: LoginPage(
           client: AccountClient(baseUrl: widget.baseUrl),
-          onSignedIn: (next) => _setToken(next),
-          onLocale: (code) => _locales.set(code),
+          onSignedIn: (next) => _setToken(next.token, userId: next.userId),
         ),
       );
     }

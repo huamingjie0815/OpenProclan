@@ -11,12 +11,10 @@ class LoginPage extends StatefulWidget {
     super.key,
     required this.client,
     required this.onSignedIn,
-    this.onLocale,
   });
 
   final AccountClient client;
-  final ValueChanged<String> onSignedIn;
-  final ValueChanged<String>? onLocale;
+  final ValueChanged<AuthSession> onSignedIn;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -64,23 +62,23 @@ class _LoginPageState extends State<LoginPage> {
     try {
       switch (_mode) {
         case _Mode.login:
-          final token = await widget.client.login(
+          final session = await widget.client.login(
             username: username,
             password: password,
           );
           if (!mounted) {
             return;
           }
-          widget.onSignedIn(token);
+          widget.onSignedIn(session);
         case _Mode.register:
-          final token = await widget.client.register(
+          final session = await widget.client.register(
             username: username,
             password: password,
           );
           if (!mounted) {
             return;
           }
-          widget.onSignedIn(token);
+          widget.onSignedIn(session);
       }
     } on AccountException catch (error) {
       if (!mounted) {
@@ -157,11 +155,7 @@ class _LoginPageState extends State<LoginPage> {
                     slivers: [
                       SliverFillRemaining(
                         hasScrollBody: false,
-                        child: _AuthPanel(
-                          onLocale: widget.onLocale,
-                          centered: true,
-                          child: form,
-                        ),
+                        child: _AuthPanel(centered: true, child: form),
                       ),
                     ],
                   ),
@@ -171,7 +165,7 @@ class _LoginPageState extends State<LoginPage> {
           : ListView(
               children: [
                 const _AuthVisual(compact: true),
-                _AuthPanel(onLocale: widget.onLocale, child: form),
+                _AuthPanel(child: form),
               ],
             ),
     );
@@ -339,14 +333,9 @@ String _enDate(DateTime now) {
 }
 
 class _AuthPanel extends StatelessWidget {
-  const _AuthPanel({
-    required this.child,
-    required this.onLocale,
-    this.centered = false,
-  });
+  const _AuthPanel({required this.child, this.centered = false});
 
   final Widget child;
-  final ValueChanged<String>? onLocale;
   final bool centered;
 
   @override
@@ -354,132 +343,38 @@ class _AuthPanel extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final tight = width < 470;
-    final en = Localizations.localeOf(context).languageCode == 'en';
     final side = centered
         ? (width * 0.05).clamp(24.0, 72.0)
         : (tight ? 12.0 : 20.0);
-    final column = Column(
-      mainAxisAlignment: centered
-          ? MainAxisAlignment.center
-          : MainAxisAlignment.start,
-      children: [
-        if (!centered && onLocale != null)
-          Align(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 432),
-              child: SizedBox(
-                width: double.infinity,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: _LangMini(en: en, onLocale: onLocale!),
-                ),
-              ),
-            ),
-          ),
-        if (!centered && onLocale != null) SizedBox(height: tight ? 8 : 12),
-        child,
-        const SizedBox(height: 18),
-        Text(
-          l.authFoot,
-          textAlign: TextAlign.center,
-          style: Red.text(
-            size: 10.5,
-            height: 1.5,
-            letterSpacing: 0.3,
-            color: Red.meta,
-          ),
-        ),
-      ],
-    );
-    final body = Padding(
-      padding: EdgeInsets.fromLTRB(
-        side,
-        centered ? 72 : (tight ? 12 : 24),
-        side,
-        centered ? 44 : (tight ? 40 : 48),
-      ),
-      child: column,
-    );
-    if (!centered || onLocale == null) {
-      return ColoredBox(color: Red.bg, child: body);
-    }
     return ColoredBox(
       color: Red.bg,
-      child: Stack(
-        children: [
-          body,
-          Positioned(
-            top: 28,
-            right: (width * 0.04).clamp(20.0, 44.0),
-            child: _LangMini(en: en, onLocale: onLocale!),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LangMini extends StatelessWidget {
-  const _LangMini({required this.en, required this.onLocale});
-
-  final bool en;
-  final ValueChanged<String> onLocale;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Red.border),
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        padding: EdgeInsets.fromLTRB(
+          side,
+          centered ? 72 : (tight ? 12 : 24),
+          side,
+          centered ? 44 : (tight ? 40 : 48),
+        ),
+        child: Column(
+          mainAxisAlignment: centered
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
-            _LangChip(label: '中文', selected: !en, onTap: () => onLocale('zh')),
-            _LangChip(
-              label: 'English',
-              selected: en,
-              onTap: () => onLocale('en'),
+            child,
+            const SizedBox(height: 18),
+            Text(
+              l.authFoot,
+              textAlign: TextAlign.center,
+              style: Red.text(
+                size: 10.5,
+                height: 1.5,
+                letterSpacing: 0.3,
+                color: Red.meta,
+              ),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _LangChip extends StatelessWidget {
-  const _LangChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onTap,
-      style: TextButton.styleFrom(
-        backgroundColor: selected ? Red.accent : Colors.transparent,
-        foregroundColor: selected ? Red.accentOn : Red.muted,
-        minimumSize: const Size(44, 30),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
-        textStyle: Red.text(
-          size: 10.5,
-          height: 1,
-          weight: FontWeight.w500,
-          letterSpacing: 0.5,
-        ),
-      ),
-      child: Text(label),
     );
   }
 }

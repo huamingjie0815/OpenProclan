@@ -7,13 +7,18 @@ import 'feed_client.dart';
 /// Local copies of cards this device has already fetched.
 /// The server only keeps about a day; read state stays here.
 class Inbox {
-  Inbox(this.prefs);
+  Inbox(this.prefs, {required this.userId});
 
-  static const key = 'proclan.inbox';
+  /// Unscoped blob from before caches were split by account. Do not read it.
+  static const legacyKey = 'proclan.inbox';
+  static const userKey = 'proclan.user';
   static const cacheKey = 'proclan.cacheMode';
   static const syncedKey = 'proclan.settingsSynced';
 
   final SharedPreferences? prefs;
+  final String userId;
+
+  static String storageKey(String userId) => '$legacyKey.$userId';
   List<FeedCard> cards = [];
   Set<String> read = {};
   Set<String> gone = {};
@@ -28,7 +33,7 @@ class Inbox {
     if (savedMode != null) {
       cacheMode = normalizeCacheMode(savedMode);
     }
-    final raw = store.getString(key);
+    final raw = store.getString(storageKey(userId));
     if (raw == null || raw.isEmpty) {
       return;
     }
@@ -162,7 +167,7 @@ class Inbox {
     }
     store.setString(cacheKey, cacheMode);
     store.setString(
-      key,
+      storageKey(userId),
       jsonEncode({
         'cards': [for (final card in cards) card.toJson()],
         'read': read.toList(),
