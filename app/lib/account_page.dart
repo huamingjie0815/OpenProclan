@@ -323,8 +323,57 @@ class _AccountPageState extends State<AccountPage> {
           for (final item in profile.cards)
             if (item.id != card.id) item,
         ],
+        listed: profile.listed,
+        code: profile.code,
+        likes: profile.likes,
+        dislikes: profile.dislikes,
+        follows: profile.follows,
       );
     });
+  }
+
+  Future<void> _setShared(bool next) async {
+    final name = _botName;
+    final account = _account;
+    if (name == null || account == null) {
+      return;
+    }
+    if (!next) {
+      final l = AppLocalizations.of(context);
+      final ok = await _confirm(
+        context,
+        title: l.communityShareStopTitle,
+        body: l.communityShareStopBody,
+        action: l.communityShareStop,
+      );
+      if (!ok || !mounted) {
+        return;
+      }
+    }
+    await _run(() async {
+      if (next) {
+        await account.shareBot(name);
+      } else {
+        await account.unshareBot(name);
+      }
+      final profile = await account.botProfile(name);
+      if (!mounted || _botName != name) {
+        return;
+      }
+      setState(() => _botProfile = profile);
+    });
+  }
+
+  Future<void> _copyCode() async {
+    final code = _botProfile?.code ?? '';
+    if (code.isEmpty) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: code));
+    if (!mounted) {
+      return;
+    }
+    showRedNotice(context, AppLocalizations.of(context).copied);
   }
 
   Future<void> _deleteBot() async {
@@ -583,6 +632,8 @@ class _AccountPageState extends State<AccountPage> {
                         busy: _busy,
                         onDelete: _deleteBot,
                         onOpen: _openCard,
+                        onShare: _setShared,
+                        onCopyCode: _copyCode,
                       ),
                     if (_screen == _AccountScreen.privacy) _PrivacyBody(),
                   ],
@@ -629,12 +680,16 @@ class _BotBody extends StatelessWidget {
     required this.busy,
     required this.onDelete,
     required this.onOpen,
+    required this.onShare,
+    required this.onCopyCode,
   });
 
   final BotProfile profile;
   final bool busy;
   final VoidCallback onDelete;
   final ValueChanged<FeedCard> onOpen;
+  final ValueChanged<bool> onShare;
+  final VoidCallback onCopyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -676,6 +731,49 @@ class _BotBody extends StatelessWidget {
                 profile.botDesc.isEmpty ? l.botDescEmpty : profile.botDesc,
                 style: Red.text(size: 14, height: 1.5),
               ),
+            ],
+          ),
+        ),
+        _Block(
+          title: l.community,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l.communityShare,
+                      style: Red.text(size: 14, height: 1.4),
+                    ),
+                  ),
+                  Switch(
+                    key: const Key('share-community'),
+                    value: profile.listed,
+                    onChanged: busy ? null : onShare,
+                  ),
+                ],
+              ),
+              if (profile.code.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '${l.communityLike} ${profile.likes} · ${l.communityDislike} ${profile.dislikes} · ${l.communityFollowerCount} ${profile.follows}',
+                  style: Red.text(size: 13, height: 1.4, color: Red.muted),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        profile.code,
+                        key: const Key('community-code'),
+                        style: Red.text(size: 16, height: 1.3, tabular: true),
+                      ),
+                    ),
+                    _TextAction(label: l.copyToken, onPressed: onCopyCode),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

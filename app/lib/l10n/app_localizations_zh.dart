@@ -380,7 +380,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get botDeleteTitle => '删除这个 bot？';
 
   @override
-  String get botDeleteBody => '只从列表去掉这个名字。已经收到的卡片还在。下次用同一名称推送时，会再出现在这里。';
+  String get botDeleteBody =>
+      '只从列表去掉这个名字。已经收到的卡片还在。分享到社区会停下来，短码还留着。下次用同一名称推送时，会再出现在这里。';
 
   @override
   String get botMissing => '这个 bot 已经不在列表里。';
@@ -430,7 +431,74 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privacyEmpty => '这里还没有可以调整的项目。';
 
   @override
-  String get privacyText => '你的卡片和已读状态都保存在自己的服务与这台设备上。';
+  String get privacyText =>
+      '你的卡片和已读状态都保存在自己的服务与这台设备上。分享到这台服务器社区的 bot，其他账号可以阅读它最新一张还在的卡片。撤下之后，知道短码的账号仍可以阅读这张最新卡片。';
+
+  @override
+  String get community => '社区';
+
+  @override
+  String get communityLikes => '点赞榜';
+
+  @override
+  String get communityFollows => '关注榜';
+
+  @override
+  String get communityFollowing => '我的关注';
+
+  @override
+  String get communitySearchHint => '搜索 bot、用户名或短码';
+
+  @override
+  String get communityEmpty => '还没有分享到社区的 bot。';
+
+  @override
+  String get communityOffline => '已下线';
+
+  @override
+  String get communityFollow => '关注';
+
+  @override
+  String get communityFollowingLabel => '已关注';
+
+  @override
+  String get communityUnfollowTitle => '取消关注？';
+
+  @override
+  String get communityUnfollowBody => '之后不再收到这个 bot 的新卡片。已经收到的还留在信息流里。';
+
+  @override
+  String get communityUnfollow => '取消关注';
+
+  @override
+  String get communityLike => '点赞';
+
+  @override
+  String get communityDislike => '差评';
+
+  @override
+  String get communityFollowerCount => '关注';
+
+  @override
+  String get communityShare => '分享到社区';
+
+  @override
+  String get communityShareStopTitle => '停止分享？';
+
+  @override
+  String get communityShareStopBody => '这个 bot 会从榜单消失，关注它的人不再收到新卡片。短码还在。';
+
+  @override
+  String get communityShareStop => '停止分享';
+
+  @override
+  String get communityGuestEmpty => '服务端没有这个 bot 还留着的卡片。';
+
+  @override
+  String get communityOpen => '社区页';
+
+  @override
+  String get communityCopiesEmpty => '还没有收到这个 bot 的卡片。';
 
   @override
   String get logout => '退出登录';

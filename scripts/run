@@ -1,12 +1,21 @@
 #!/bin/sh
 # Usage: ./scripts/run [device]
-# Reads app/.env. Default device is macos.
+#        ./scripts/run dev [device]
+#        ./scripts/run production [device]
+# dev reads app/.env.development. production reads app/.env.production.
+# Any other first argument is the device, and the file is app/.env.
+# Default device is macos.
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$root/app"
+envfile=.env
+if [ "${1:-}" = "dev" ] || [ "${1:-}" = "production" ]; then
+  envfile=".env.$1"
+  shift
+fi
 device=${1:-macos}
-if [ ! -f .env ]; then
-  echo "missing app/.env. Copy app/.env.example and set API_BASE." >&2
+if [ ! -f "$envfile" ]; then
+  echo "missing app/$envfile. Copy app/.env.example and set API_BASE." >&2
   exit 1
 fi
-exec flutter run -d "$device" --dart-define-from-file=.env
+exec flutter run -d "$device" --dart-define-from-file="$envfile"

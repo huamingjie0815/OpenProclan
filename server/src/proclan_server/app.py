@@ -24,6 +24,7 @@ from proclan_server.accounts import (
     register,
 )
 from proclan_server.categories import CATEGORIES
+from proclan_server.community import register_community
 from proclan_server.config import Settings, load_settings
 from proclan_server.hashing import new_secret
 from proclan_server.identity import current_user_id
@@ -124,6 +125,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.store = store
     app.state.mcp = mcp
     app.mount("/mcp", mcp_app)
+    register_community(app, store, settings, _card_json, _cutoff)
     app.state.mcp_inflight = Inflight(settings.mcp_inflight)
 
     @app.post("/v1/auth/register")
@@ -210,6 +212,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "first_seen": first_seen,
             "bot_desc": bot_desc,
             "cards": [_card_json(card, request) for card in cards],
+            "community": store.community_for_owner(request.state.user_id, bot_name),
         }
 
     @app.delete("/v1/bots/profile", status_code=204)
@@ -439,7 +442,7 @@ def _image_url(name: str, base: str) -> str:
 
 def _card_json(card: Card, request: Request) -> dict:
     base = str(request.base_url).rstrip("/")
-    return {
+    body = {
         "id": card.id,
         "title": card.title,
         "summary": card.summary,
@@ -452,6 +455,9 @@ def _card_json(card: Card, request: Request) -> dict:
         "created_bot": card.created_bot,
         "created_at": card.created_at,
     }
+    if card.source_username:
+        body["source_username"] = card.source_username
+    return body
 
 
 class _Register(BaseModel):

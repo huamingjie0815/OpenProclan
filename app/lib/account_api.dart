@@ -31,12 +31,22 @@ class BotProfile {
     required this.firstSeen,
     required this.botDesc,
     required this.cards,
+    this.listed = false,
+    this.code = '',
+    this.likes = 0,
+    this.dislikes = 0,
+    this.follows = 0,
   });
 
   final String name;
   final String firstSeen;
   final String botDesc;
   final List<FeedCard> cards;
+  final bool listed;
+  final String code;
+  final int likes;
+  final int dislikes;
+  final int follows;
 
   factory BotProfile.fromJson(Map<String, dynamic> json) {
     final raw = json['cards'];
@@ -48,11 +58,18 @@ class BotProfile {
         }
       }
     }
+    final community = json['community'];
+    final stamp = community is Map ? Map<String, dynamic>.from(community) : const {};
     return BotProfile(
       name: json['name'] as String? ?? '',
       firstSeen: json['first_seen'] as String? ?? '',
       botDesc: json['bot_desc'] as String? ?? '',
       cards: cards,
+      listed: stamp['listed'] == true,
+      code: stamp['code'] as String? ?? '',
+      likes: stamp['likes'] as int? ?? 0,
+      dislikes: stamp['dislikes'] as int? ?? 0,
+      follows: stamp['follows'] as int? ?? 0,
     );
   }
 }
@@ -256,6 +273,29 @@ class AccountClient {
     return _send(
       () => _http.delete(_profileUri(name), headers: _headers),
       const {204},
+    );
+  }
+
+  Future<void> shareBot(String name) {
+    return _send(
+      () => _http.post(
+        Uri.parse('$baseUrl/v1/community/share'),
+        headers: _headers,
+        body: jsonEncode({'name': name}),
+      ),
+      const {200},
+    );
+  }
+
+  Future<void> unshareBot(String name) {
+    return _send(
+      () => _http.delete(
+        Uri.parse('$baseUrl/v1/community/share').replace(
+          queryParameters: {'name': name},
+        ),
+        headers: _headers,
+      ),
+      const {200},
     );
   }
 

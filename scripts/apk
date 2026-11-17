@@ -1,11 +1,18 @@
 #!/bin/sh
-# Release APK. Signing stays the Android debug key. Reads app/.env.
+# Release APK. Signing stays the Android debug key.
+# Usage: ./scripts/apk [dev|production]
+# dev reads app/.env.development. production reads app/.env.production.
+# With no argument, reads app/.env.
 set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$root/app"
-if [ ! -f .env ]; then
-  echo "missing app/.env. Copy app/.env.example and set API_BASE." >&2
+envfile=.env
+if [ "${1:-}" = "dev" ] || [ "${1:-}" = "production" ]; then
+  envfile=".env.$1"
+fi
+if [ ! -f "$envfile" ]; then
+  echo "missing app/$envfile. Copy app/.env.example and set API_BASE." >&2
   exit 1
 fi
-flutter build apk --release --dart-define-from-file=.env
+flutter build apk --release --dart-define-from-file="$envfile"
 echo "$root/app/build/app/outputs/flutter-apk/app-release.apk"

@@ -42,12 +42,17 @@ Future<DetailResult?> openCardDetail(
   required FeedCard card,
   required FeedClient client,
   String? backTooltip,
+  bool manage = true,
 }) {
   return Navigator.push<DetailResult>(
     context,
     PageRouteBuilder<DetailResult>(
-      pageBuilder: (_, _, _) =>
-          DetailPage(card: card, client: client, backTooltip: backTooltip),
+      pageBuilder: (_, _, _) => DetailPage(
+        card: card,
+        client: client,
+        backTooltip: backTooltip,
+        manage: manage,
+      ),
       transitionDuration: const Duration(milliseconds: 280),
       reverseTransitionDuration: const Duration(milliseconds: 280),
       transitionsBuilder: (_, animation, _, child) {
@@ -67,12 +72,16 @@ class DetailPage extends StatefulWidget {
     required this.card,
     required this.client,
     this.backTooltip,
+    this.manage = true,
   });
 
   final FeedCard card;
   final FeedClient client;
 
   final String? backTooltip;
+
+  /// False when this is someone else's original card.
+  final bool manage;
 
   @override
   State<DetailPage> createState() => _DetailPageState();
@@ -467,16 +476,17 @@ class _DetailPageState extends State<DetailPage> {
                                   const SizedBox(height: 20),
                                   _SourceBox(card: card, onOpen: _open),
                                 ],
-                                const SizedBox(height: 20),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: _GhostButton(
-                                    label: l.markUnread,
-                                    onPressed: _markUnread,
+                                if (widget.manage) ...[
+                                  const SizedBox(height: 20),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: _GhostButton(
+                                      label: l.markUnread,
+                                      onPressed: _markUnread,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                OutlinedButton.icon(
+                                  const SizedBox(height: 8),
+                                  OutlinedButton.icon(
                                   onPressed: _deleting ? null : _delete,
                                   icon: Icon(
                                     Icons.delete_outline,
@@ -501,10 +511,13 @@ class _DetailPageState extends State<DetailPage> {
                                     ),
                                   ),
                                 ),
+                                ],
                                 if (card.createdBot.isNotEmpty) ...[
                                   const SizedBox(height: 16),
                                   Text(
-                                    card.createdBot.toUpperCase(),
+                                    card.sourceUsername.isEmpty
+                                        ? card.createdBot.toUpperCase()
+                                        : '${card.createdBot.toUpperCase()} · ${card.sourceUsername}',
                                     style: Red.text(
                                       size: 10.5,
                                       color: Red.meta,

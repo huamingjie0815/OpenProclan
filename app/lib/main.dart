@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'account_api.dart';
+import 'community_api.dart';
 import 'feed_client.dart';
 import 'feed_page.dart';
 import 'l10n/app_localizations.dart';
@@ -90,6 +91,7 @@ class _AppRootState extends State<AppRoot> {
   late final ThemeController _themes = ThemeController(widget.prefs);
   HttpFeedClient? _feed;
   AccountClient? _account;
+  HttpCommunityClient? _community;
 
   @override
   void initState() {
@@ -107,13 +109,16 @@ class _AppRootState extends State<AppRoot> {
   void _open(String token) {
     final feed = _feed;
     final account = _account;
-    if (feed == null || account == null) {
+    final community = _community;
+    if (feed == null || account == null || community == null) {
       _feed = HttpFeedClient(baseUrl: widget.baseUrl, token: token);
       _account = AccountClient(baseUrl: widget.baseUrl, token: token);
+      _community = HttpCommunityClient(baseUrl: widget.baseUrl, token: token);
       return;
     }
     feed.token = token;
     account.token = token;
+    community.token = token;
   }
 
   Future<void> _setToken(String? token) async {
@@ -132,6 +137,7 @@ class _AppRootState extends State<AppRoot> {
     if (token == null) {
       _feed = null;
       _account = null;
+      _community = null;
     }
     if (stay) {
       return;
@@ -154,7 +160,8 @@ class _AppRootState extends State<AppRoot> {
     final token = _token;
     final feed = _feed;
     final account = _account;
-    if (token == null || feed == null || account == null) {
+    final community = _community;
+    if (token == null || feed == null || account == null || community == null) {
       return ProclanShell(
         locales: _locales,
         themes: _themes,
@@ -171,6 +178,7 @@ class _AppRootState extends State<AppRoot> {
       themes: _themes,
       prefs: widget.prefs,
       account: account,
+      community: community,
       onLogout: _logout,
     );
   }
@@ -186,6 +194,7 @@ class ProclanApp extends StatelessWidget {
     this.themes,
     this.prefs,
     this.account,
+    this.community,
     this.onLogout,
   });
 
@@ -196,6 +205,7 @@ class ProclanApp extends StatelessWidget {
   final ThemeController? themes;
   final SharedPreferences? prefs;
   final AccountClient? account;
+  final CommunityClient? community;
   final Future<void> Function()? onLogout;
 
   @override
@@ -212,6 +222,7 @@ class ProclanApp extends StatelessWidget {
         pollEvery: pollEvery,
         prefs: prefs,
         account: account,
+        community: community,
         onLogout: onLogout,
         onTheme: theme == null ? null : (value) => theme.setDark(value),
         onLocale: fixed ? null : (code) => controller.set(code),
