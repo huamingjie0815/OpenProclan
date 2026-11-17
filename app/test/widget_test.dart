@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:proclan_app/account_api.dart';
 import 'package:proclan_app/detail_page.dart';
 import 'package:proclan_app/feed_client.dart';
+import 'package:proclan_app/inbox.dart';
 import 'package:proclan_app/l10n/app_localizations.dart';
 import 'package:proclan_app/login_page.dart';
 import 'package:proclan_app/main.dart';
@@ -130,6 +131,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('登录后，只看属于你的日报。'), findsOneWidget);
     expect(find.text('用户名'), findsOneWidget);
+    expect(find.text('中文'), findsNothing);
+    expect(find.text('English'), findsNothing);
     expect(find.text('忘记密码'), findsNothing);
     expect(find.text('验证码'), findsNothing);
 
@@ -146,6 +149,38 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('登录后，只看属于你的日报。'), findsOneWidget);
     expect(find.text('忘记密码'), findsNothing);
+  });
+
+  testWidgets('feed hides the previous account cache', (tester) async {
+    final previous = _card(id: 'ada', title: '上一个账号', category: '科技');
+    final current = _card(id: 'bao', title: '这个账号', category: '科技');
+    SharedPreferences.setMockInitialValues({
+      Inbox.userKey: 'bao',
+      Inbox.legacyKey: jsonEncode({
+        'cards': [previous.toJson()],
+        'read': <String>[],
+        'gone': <String>[],
+      }),
+      Inbox.storageKey('bao'): jsonEncode({
+        'cards': [current.toJson()],
+        'read': <String>[],
+        'gone': <String>[],
+      }),
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProclanApp(
+        locale: const Locale('zh'),
+        client: FakeFeedClient(const []),
+        pollEvery: null,
+        prefs: prefs,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('这个账号'), findsOneWidget);
+    expect(find.text('上一个账号'), findsNothing);
+    expect(prefs.getString(Inbox.legacyKey), isNull);
   });
 
   testWidgets('empty feed explains how content arrives', (tester) async {

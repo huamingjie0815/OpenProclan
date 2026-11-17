@@ -11,6 +11,13 @@ class AccountException implements Exception {
   final String detail;
 }
 
+class AuthSession {
+  const AuthSession({required this.token, required this.userId});
+
+  final String token;
+  final String userId;
+}
+
 class AccountUser {
   const AccountUser({required this.id, required this.username});
 
@@ -127,7 +134,7 @@ class AccountClient {
     'Content-Type': 'application/json',
   };
 
-  Future<String> register({
+  Future<AuthSession> register({
     required String username,
     required String password,
   }) async {
@@ -139,10 +146,10 @@ class AccountClient {
       ),
       const {200},
     );
-    return body['token'] as String? ?? '';
+    return _session(body);
   }
 
-  Future<String> login({
+  Future<AuthSession> login({
     required String username,
     required String password,
   }) async {
@@ -154,7 +161,7 @@ class AccountClient {
       ),
       const {200},
     );
-    return body['token'] as String? ?? '';
+    return _session(body);
   }
 
   Future<void> logout() {
@@ -324,6 +331,12 @@ class AccountClient {
     }
     return {};
   }
+}
+
+AuthSession _session(Map<String, dynamic> body) {
+  final raw = body['user'];
+  final id = raw is Map ? raw['id'] as String? ?? '' : '';
+  return AuthSession(token: body['token'] as String? ?? '', userId: id);
 }
 
 String _detail(String body) {

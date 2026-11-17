@@ -22,6 +22,12 @@ FeedCard _card(String id, DateTime created) {
   );
 }
 
+const _user = 'ada';
+
+Inbox _open(SharedPreferences prefs, [String userId = _user]) {
+  return Inbox(prefs, userId: userId)..load();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -30,7 +36,7 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
-      final inbox = Inbox(prefs)..load();
+      final inbox = _open(prefs);
       inbox.setCacheMode('after_read');
       final card = _card('a', DateTime.now());
       inbox.merge([card]);
@@ -53,7 +59,7 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
-      final inbox = Inbox(prefs)..load();
+      final inbox = _open(prefs);
       final recent = _card(
         'recent',
         DateTime.now().subtract(const Duration(days: 2)),
@@ -69,7 +75,7 @@ void main() {
       inbox.merge(const []);
       expect(inbox.cards.map((item) => item.id), ['recent']);
 
-      final again = Inbox(prefs)..load();
+      final again = _open(prefs);
       expect(again.cards.map((item) => item.id), ['recent']);
       expect(again.cacheMode, '7d');
     },
@@ -79,7 +85,7 @@ void main() {
     final now = DateTime.now().toUtc();
     SharedPreferences.setMockInitialValues({
       Inbox.cacheKey: '7d',
-      Inbox.key: jsonEncode({
+      Inbox.storageKey(_user): jsonEncode({
         'cards': [
           _card('recent', now.subtract(const Duration(days: 2))).toJson(),
           _card('old', now.subtract(const Duration(days: 8))).toJson(),
@@ -89,20 +95,40 @@ void main() {
       }),
     });
     final prefs = await SharedPreferences.getInstance();
-    final inbox = Inbox(prefs)..load();
+    final inbox = _open(prefs);
 
     expect(inbox.cards.map((item) => item.id), ['recent']);
     expect(inbox.read, {'recent'});
 
-    final again = Inbox(prefs)..load();
+    final again = _open(prefs);
     expect(again.cards.map((item) => item.id), ['recent']);
     expect(again.read, {'recent'});
+  });
+
+  test('one account cache does not open for another account', () async {
+    SharedPreferences.setMockInitialValues({
+      Inbox.legacyKey: jsonEncode({
+        'cards': [_card('previous', DateTime.now()).toJson()],
+        'read': <String>[],
+        'gone': <String>[],
+      }),
+    });
+    final prefs = await SharedPreferences.getInstance();
+    final ada = _open(prefs);
+    ada.merge([_card('ada-card', DateTime.now())]);
+
+    final bao = _open(prefs, 'bao');
+    expect(bao.cards, isEmpty);
+
+    bao.merge([_card('bao-card', DateTime.now())]);
+    expect(_open(prefs).cards.map((item) => item.id), ['ada-card']);
+    expect(_open(prefs, 'bao').cards.map((item) => item.id), ['bao-card']);
   });
 
   test('one day cache drops cards older than a day', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
-    final inbox = Inbox(prefs)..load();
+    final inbox = _open(prefs);
     inbox.setCacheMode('1d');
     inbox.merge([
       _card('fresh', DateTime.now().subtract(const Duration(hours: 2))),

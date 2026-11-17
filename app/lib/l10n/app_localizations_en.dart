@@ -442,19 +442,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rotated => 'Token rotated';
 
   @override
-  String get privacy => 'Privacy';
-
-  @override
-  String get privacySub => 'Local data and visibility';
-
-  @override
-  String get privacyEmpty => 'Nothing to change here yet.';
-
-  @override
-  String get privacyText =>
-      'Your cards and read state stay on your server and this device. When you share a bot to this server\'s community, other accounts can read the latest card that bot still has. After you stop sharing, an account that knows the code can still read that latest card.';
-
-  @override
   String get community => 'Community';
 
   @override
