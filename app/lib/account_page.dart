@@ -8,17 +8,12 @@ import 'feed_client.dart';
 import 'l10n/app_localizations.dart';
 import 'red.dart';
 
+enum AccountOpen { bots, security, privacy }
+
 class AccountPage extends StatefulWidget {
   const AccountPage({
     super.key,
-    required this.unreadOnly,
-    required this.onUnreadOnly,
-    required this.unreadCount,
-    required this.cacheMode,
-    required this.onCacheMode,
-    this.onLocale,
-    this.onTheme,
-    this.syncSeconds,
+    required this.open,
     this.account,
     this.feed,
     this.onCardOpened,
@@ -26,14 +21,7 @@ class AccountPage extends StatefulWidget {
     this.onLogout,
   });
 
-  final bool unreadOnly;
-  final ValueChanged<bool> onUnreadOnly;
-  final int unreadCount;
-  final String cacheMode;
-  final ValueChanged<String> onCacheMode;
-  final ValueChanged<String>? onLocale;
-  final ValueChanged<bool>? onTheme;
-  final int? syncSeconds;
+  final AccountOpen open;
   final AccountClient? account;
   final FeedClient? feed;
   final void Function(FeedCard card)? onCardOpened;
@@ -45,9 +33,7 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  late var _unread = widget.unreadOnly;
-  late var _cache = widget.cacheMode;
-  var _screen = _AccountScreen.hub;
+  var _screen = _AccountScreen.bots;
   late final AccountClient? _account = widget.account;
 
   final _username = TextEditingController();
@@ -64,6 +50,11 @@ class _AccountPageState extends State<AccountPage> {
   @override
   void initState() {
     super.initState();
+    _screen = switch (widget.open) {
+      AccountOpen.bots => _AccountScreen.bots,
+      AccountOpen.security => _AccountScreen.security,
+      AccountOpen.privacy => _AccountScreen.privacy,
+    };
     _loadAccount();
   }
 
@@ -253,29 +244,17 @@ class _AccountPageState extends State<AccountPage> {
     });
   }
 
-  Future<void> _logout() async {
-    final l = AppLocalizations.of(context);
-    final ok = await _confirm(
-      context,
-      title: l.logoutTitle,
-      body: l.logoutBody,
-      action: l.logout,
-    );
-    if (!ok || !mounted) {
-      return;
-    }
-    await widget.onLogout?.call();
-  }
-
   void _open(_AccountScreen screen) {
     setState(() => _screen = screen);
   }
 
+  bool get _atRoot => switch (widget.open) {
+    AccountOpen.bots => _screen == _AccountScreen.bots,
+    AccountOpen.security => _screen == _AccountScreen.security,
+    AccountOpen.privacy => _screen == _AccountScreen.privacy,
+  };
+
   void _back() {
-    if (_screen == _AccountScreen.hub) {
-      Navigator.pop(context);
-      return;
-    }
     if (_screen == _AccountScreen.password) {
       _open(_AccountScreen.security);
       return;
@@ -284,7 +263,7 @@ class _AccountPageState extends State<AccountPage> {
       _open(_AccountScreen.bots);
       return;
     }
-    _open(_AccountScreen.hub);
+    Navigator.pop(context);
   }
 
   Future<void> _openBot(String name) async {
@@ -385,14 +364,10 @@ class _AccountPageState extends State<AccountPage> {
   Widget build(BuildContext context) {
     Theme.of(context);
     final l = AppLocalizations.of(context);
-    final en = Localizations.localeOf(context).languageCode == 'en';
     final width = MediaQuery.sizeOf(context).width;
     final pad = Red.gutter(width);
     final signedIn = _account != null;
-    final seconds = widget.syncSeconds;
     final title = switch (_screen) {
-      _AccountScreen.hub => l.me,
-      _AccountScreen.prefs => l.preferences,
       _AccountScreen.security => l.security,
       _AccountScreen.password => l.passwordSection,
       _AccountScreen.bots => l.bots,
@@ -400,7 +375,7 @@ class _AccountPageState extends State<AccountPage> {
       _AccountScreen.privacy => l.privacy,
     };
     return PopScope(
-      canPop: _screen == _AccountScreen.hub,
+      canPop: _atRoot,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) {
           return;
@@ -419,90 +394,6 @@ class _AccountPageState extends State<AccountPage> {
                 child: ListView(
                   padding: EdgeInsets.fromLTRB(pad, 24, pad, 72),
                   children: [
-                    if (_screen == _AccountScreen.hub)
-                      _Hub(
-                        name: _username.text.trim(),
-                        bots: _bots.length,
-                        unread: widget.unreadCount,
-                        cache: switch (_cache) {
-                          '1d' => l.cache1d,
-                          'after_read' => l.cacheAfterRead,
-                          _ => l.cache7d,
-                        },
-                        signedIn: signedIn,
-                        onEdit: () => _open(_AccountScreen.security),
-                        onPrefs: () => _open(_AccountScreen.prefs),
-                        onSecurity: () => _open(_AccountScreen.security),
-                        onBots: () => _open(_AccountScreen.bots),
-                        onPrivacy: () => _open(_AccountScreen.privacy),
-                        onLogout: signedIn ? _logout : null,
-                      ),
-                    if (_screen == _AccountScreen.prefs) ...[
-                      _Block(
-                        title: l.appearance,
-                        note: l.appearanceNote,
-                        child: _Segmented(
-                          children: [
-                            _Seg(
-                              label: l.themeDark,
-                              selected: Red.dark,
-                              onTap: () => _setTheme(true),
-                            ),
-                            _Seg(
-                              label: l.themeLight,
-                              selected: !Red.dark,
-                              onTap: () => _setTheme(false),
-                            ),
-                          ],
-                        ),
-                      ),
-                      _Panel(
-                        children: [
-                          _Language(
-                            note: l.languageNote,
-                            title: l.language,
-                            en: en,
-                            onLocale: widget.onLocale,
-                          ),
-                          _SettingRow(
-                            title: l.unreadOnly,
-                            note: l.unreadNote,
-                            trailing: _Switch(
-                              key: const Key('unread-switch'),
-                              value: _unread,
-                              label: l.unreadOnly,
-                              onChanged: (value) {
-                                setState(() => _unread = value);
-                                widget.onUnreadOnly(value);
-                              },
-                            ),
-                          ),
-                          if (seconds != null)
-                            _SettingRow(
-                              title: l.autoSync,
-                              note: l.autoSyncNote(seconds),
-                              trailing: Text(
-                                l.running,
-                                style: Red.text(
-                                  size: 12,
-                                  color: Red.fg2,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          _Cache(
-                            title: l.cacheMode,
-                            note: l.cacheNote,
-                            mode: _cache,
-                            labels: (l.cache7d, l.cache1d, l.cacheAfterRead),
-                            onChanged: (mode) {
-                              setState(() => _cache = mode);
-                              widget.onCacheMode(mode);
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
                     if (_screen == _AccountScreen.security && signedIn) ...[
                       _Block(
                         title: l.account,
@@ -704,15 +595,6 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  void _setTheme(bool dark) {
-    final onTheme = widget.onTheme;
-    if (onTheme != null) {
-      onTheme(dark);
-      return;
-    }
-    Red.apply(dark);
-    setState(() {});
-  }
 }
 
 String mcpUrl(String baseUrl) {
@@ -739,7 +621,7 @@ String mcpSetupPrompt(
   return '${l.mcpPrompt(url, token)}\n\n$command';
 }
 
-enum _AccountScreen { hub, prefs, security, password, bots, bot, privacy }
+enum _AccountScreen { security, password, bots, bot, privacy }
 
 class _BotBody extends StatelessWidget {
   const _BotBody({
@@ -881,8 +763,6 @@ class _PushRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Eyebrow(categoryLabel(l, card.category)),
-          const SizedBox(height: 8),
           Text(
             card.title,
             style: Red.text(size: 16, height: 1.35, weight: FontWeight.w500),
@@ -902,242 +782,6 @@ class _PushRow extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _Hub extends StatelessWidget {
-  const _Hub({
-    required this.name,
-    required this.bots,
-    required this.unread,
-    required this.cache,
-    required this.signedIn,
-    required this.onEdit,
-    required this.onPrefs,
-    required this.onSecurity,
-    required this.onBots,
-    required this.onPrivacy,
-    required this.onLogout,
-  });
-
-  final String name;
-  final int bots;
-  final int unread;
-  final String cache;
-  final bool signedIn;
-  final VoidCallback onEdit;
-  final VoidCallback onPrefs;
-  final VoidCallback onSecurity;
-  final VoidCallback onBots;
-  final VoidCallback onPrivacy;
-  final VoidCallback? onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final shown = name;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: Red.surfaceWarm,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Red.border),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Red.accent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: SizedBox(
-                        width: 58,
-                        height: 58,
-                        child: Center(
-                          child: Text(
-                            nameMark(shown),
-                            style: Red.text(
-                              size: 24,
-                              height: 1,
-                              weight: FontWeight.w500,
-                              color: Red.accentOn,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            shown,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Red.text(
-                              size: 25,
-                              height: 1.15,
-                              weight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (signedIn)
-                      OutlinedButton(
-                        onPressed: onEdit,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Red.fg2,
-                          side: BorderSide(color: Red.border),
-                          minimumSize: const Size(0, 34),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          textStyle: Red.text(size: 11, height: 1),
-                        ),
-                        child: Text(l.profileEdit),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: Red.border)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Row(
-                      children: [
-                        _Stat(
-                          value: '$bots',
-                          label: l.statBots,
-                          edge: false,
-                          valueKey: const Key('stat-bots'),
-                        ),
-                        _Stat(value: '$unread', label: l.statUnread),
-                        _Stat(value: cache, label: l.statCache),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        _TocLabel(l.reading),
-        _TocCard(
-          children: [
-            _TocRow(
-              key: const Key('account-prefs'),
-              icon: Icons.tune,
-              title: l.preferences,
-              subtitle: l.preferencesSub,
-              onTap: onPrefs,
-            ),
-            if (signedIn) ...[
-              _TocRow(
-                icon: Icons.person_outline,
-                title: l.security,
-                subtitle: l.securitySub,
-                onTap: onSecurity,
-              ),
-              _TocRow(
-                icon: Icons.smart_toy_outlined,
-                title: l.bots,
-                subtitle: l.botsSub,
-                onTap: onBots,
-              ),
-            ],
-          ],
-        ),
-        _TocLabel(l.more),
-        _TocCard(
-          children: [
-            _TocRow(
-              icon: Icons.lock_outline,
-              title: l.privacy,
-              subtitle: l.privacySub,
-              onTap: onPrivacy,
-            ),
-            if (onLogout != null)
-              _TocRow(
-                icon: Icons.logout,
-                title: l.logout,
-                subtitle: l.logoutSub,
-                danger: true,
-                onTap: onLogout!,
-              ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Text(
-          l.accountFoot,
-          textAlign: TextAlign.center,
-          style: Red.text(size: 10, height: 1.6, color: Red.meta),
-        ),
-      ],
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({
-    required this.value,
-    required this.label,
-    this.edge = true,
-    this.valueKey,
-  });
-
-  final String value;
-  final String label;
-  final bool edge;
-  final Key? valueKey;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: edge
-              ? Border(left: BorderSide(color: Red.border))
-              : const Border(),
-        ),
-        child: Padding(
-          padding: EdgeInsets.only(left: edge ? 16 : 0, right: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                key: valueKey,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Red.text(size: 18, height: 1.2, weight: FontWeight.w500),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label.toUpperCase(),
-                style: Red.text(
-                  size: 10,
-                  height: 1.2,
-                  letterSpacing: 1,
-                  color: Red.meta,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1988,4 +1632,380 @@ Future<bool> _confirm(
     },
   );
   return result == true;
+}
+
+Future<void> showSettingsCard(
+  BuildContext context, {
+  required bool unreadOnly,
+  required ValueChanged<bool> onUnreadOnly,
+  required String cacheMode,
+  required ValueChanged<String> onCacheMode,
+  required ValueChanged<String>? onLocale,
+  required ValueChanged<bool>? onTheme,
+  required int? syncSeconds,
+  required AccountClient? account,
+  required Future<void> Function()? onLogout,
+  required VoidCallback onSecurity,
+  required VoidCallback onPrivacy,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Red.scrim,
+    builder: (context) {
+      final height = MediaQuery.sizeOf(context).height;
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: height - 18),
+          child: Material(
+            color: Red.bg,
+            shape: RoundedRectangleBorder(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
+              side: BorderSide(color: Red.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: _SettingsCard(
+              unreadOnly: unreadOnly,
+              onUnreadOnly: onUnreadOnly,
+              cacheMode: cacheMode,
+              onCacheMode: onCacheMode,
+              onLocale: onLocale,
+              onTheme: onTheme,
+              syncSeconds: syncSeconds,
+              account: account,
+              onLogout: onLogout,
+              onSecurity: onSecurity,
+              onPrivacy: onPrivacy,
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _SettingsCard extends StatefulWidget {
+  const _SettingsCard({
+    required this.unreadOnly,
+    required this.onUnreadOnly,
+    required this.cacheMode,
+    required this.onCacheMode,
+    required this.onLocale,
+    required this.onTheme,
+    required this.syncSeconds,
+    required this.account,
+    required this.onLogout,
+    required this.onSecurity,
+    required this.onPrivacy,
+  });
+
+  final bool unreadOnly;
+  final ValueChanged<bool> onUnreadOnly;
+  final String cacheMode;
+  final ValueChanged<String> onCacheMode;
+  final ValueChanged<String>? onLocale;
+  final ValueChanged<bool>? onTheme;
+  final int? syncSeconds;
+  final AccountClient? account;
+  final Future<void> Function()? onLogout;
+  final VoidCallback onSecurity;
+  final VoidCallback onPrivacy;
+
+  @override
+  State<_SettingsCard> createState() => _SettingsCardState();
+}
+
+class _SettingsCardState extends State<_SettingsCard> {
+  late var _unread = widget.unreadOnly;
+  late var _cache = widget.cacheMode;
+  var _name = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadName();
+  }
+
+  @override
+  void didUpdateWidget(_SettingsCard old) {
+    super.didUpdateWidget(old);
+    if (old.unreadOnly != widget.unreadOnly) {
+      _unread = widget.unreadOnly;
+    }
+    if (old.cacheMode != widget.cacheMode) {
+      _cache = widget.cacheMode;
+    }
+  }
+
+  Future<void> _loadName() async {
+    final account = widget.account;
+    if (account == null) {
+      return;
+    }
+    try {
+      final user = await account.me();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _name = user.username);
+    } catch (_) {}
+  }
+
+  void _setTheme(bool dark) {
+    final onTheme = widget.onTheme;
+    if (onTheme != null) {
+      onTheme(dark);
+      return;
+    }
+    Red.apply(dark);
+    setState(() {});
+  }
+
+  void _open(VoidCallback next) {
+    Navigator.pop(context);
+    next();
+  }
+
+  Future<void> _logout() async {
+    final l = AppLocalizations.of(context);
+    final ok = await _confirm(
+      context,
+      title: l.logoutTitle,
+      body: l.logoutBody,
+      action: l.logout,
+    );
+    if (!ok || !mounted) {
+      return;
+    }
+    await widget.onLogout?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final l = AppLocalizations.of(context);
+    final en = Localizations.localeOf(context).languageCode == 'en';
+    final signedIn = widget.account != null;
+    final seconds = widget.syncSeconds;
+    final name = _name.trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 8),
+        Container(
+          width: 38,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Red.lineStrong,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        const SizedBox(height: 10),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: Red.border)),
+          ),
+          child: SizedBox(
+            height: 46,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16, right: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l.preferences,
+                      style: Red.text(
+                        size: 17,
+                        height: 1.3,
+                        weight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('close-settings'),
+                    tooltip: l.close,
+                    onPressed: () => Navigator.pop(context),
+                    style: IconButton.styleFrom(
+                      foregroundColor: Red.muted,
+                      fixedSize: const Size(44, 44),
+                    ),
+                    icon: const Icon(Icons.chevron_left, size: 19),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Flexible(
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              14,
+              16,
+              18 + MediaQuery.paddingOf(context).bottom,
+            ),
+            shrinkWrap: true,
+            children: [
+              if (signedIn)
+                Material(
+                  color: Red.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: Red.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _open(widget.onSecurity),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 60),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: Red.surfaceWarm,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Red.border),
+                              ),
+                              child: Text(
+                                name.isEmpty ? '' : nameMark(name),
+                                style: Red.text(size: 14, height: 1),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Red.text(
+                                  size: 12,
+                                  height: 1.4,
+                                  weight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 16,
+                              color: Red.meta,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              _TocLabel(l.appearance),
+              _Block(
+                title: l.appearance,
+                note: l.appearanceNote,
+                child: _Segmented(
+                  children: [
+                    _Seg(
+                      label: l.themeDark,
+                      selected: Red.dark,
+                      onTap: () => _setTheme(true),
+                    ),
+                    _Seg(
+                      label: l.themeLight,
+                      selected: !Red.dark,
+                      onTap: () => _setTheme(false),
+                    ),
+                  ],
+                ),
+              ),
+              _Panel(
+                children: [
+                  _Language(
+                    note: l.languageNote,
+                    title: l.language,
+                    en: en,
+                    onLocale: widget.onLocale,
+                  ),
+                  _SettingRow(
+                    title: l.unreadOnly,
+                    note: l.unreadNote,
+                    trailing: _Switch(
+                      key: const Key('unread-switch'),
+                      value: _unread,
+                      label: l.unreadOnly,
+                      onChanged: (value) {
+                        setState(() => _unread = value);
+                        widget.onUnreadOnly(value);
+                      },
+                    ),
+                  ),
+                  if (seconds != null)
+                    _SettingRow(
+                      title: l.autoSync,
+                      note: l.autoSyncNote(seconds),
+                      trailing: Text(
+                        l.running,
+                        style: Red.text(size: 12, color: Red.fg2, height: 1.4),
+                      ),
+                    ),
+                  _Cache(
+                    title: l.cacheMode,
+                    note: l.cacheNote,
+                    mode: _cache,
+                    labels: (l.cache7d, l.cache1d, l.cacheAfterRead),
+                    onChanged: (mode) {
+                      setState(() => _cache = mode);
+                      widget.onCacheMode(mode);
+                    },
+                  ),
+                ],
+              ),
+              _TocLabel(l.more),
+              _TocCard(
+                children: [
+                  if (signedIn)
+                    _TocRow(
+                      icon: Icons.person_outline,
+                      title: l.security,
+                      subtitle: l.securitySub,
+                      onTap: () => _open(widget.onSecurity),
+                    ),
+                  _TocRow(
+                    icon: Icons.lock_outline,
+                    title: l.privacy,
+                    subtitle: l.privacySub,
+                    onTap: () => _open(widget.onPrivacy),
+                  ),
+                ],
+              ),
+              if (widget.onLogout != null) ...[
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: _logout,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Red.dangerFg,
+                    side: BorderSide(color: Red.dangerLine),
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    textStyle: Red.text(size: 12, height: 1),
+                  ),
+                  child: Text(l.logout),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }

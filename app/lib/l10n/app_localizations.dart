@@ -368,6 +368,24 @@ abstract class AppLocalizations {
   /// **'昨天 {time}'**
   String yesterdayAt(String time);
 
+  /// No description provided for @openMenu.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开侧边栏'**
+  String get openMenu;
+
+  /// No description provided for @closeMenu.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭侧边栏'**
+  String get closeMenu;
+
+  /// No description provided for @drawerCaption.
+  ///
+  /// In zh, this message translates to:
+  /// **'个人内容空间'**
+  String get drawerCaption;
+
   /// No description provided for @settings.
   ///
   /// In zh, this message translates to:

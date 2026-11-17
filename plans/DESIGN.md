@@ -2,9 +2,7 @@ English | [中文](DESIGN.zh.md)
 
 # Interface
 
-The current visual source is the 2026-10-26 editorial draft.
-
-The draft was a single HTML file. The product is the Flutter app. Implement this visual system there. Do not start a separate website.
+The current visual source is the OpenDesign phone draft. The product is the Flutter app. Implement this visual system there. Do not start a separate website.
 
 ## Tone
 
@@ -49,21 +47,19 @@ Both modes ask for a username and a password. Register shows the note "This is y
 
 ## Feed
 
-The masthead is the date: a large day, the month and weekday, and the count for this edition. On the right are unread, refresh, and the user avatar, which opens settings. The avatar is the first character of the username. A Latin letter is uppercased. It matches the avatar on Me. Until the username has loaded, the masthead mark is blank.
+The masthead is a sidebar control, the unread control, and the date on the right: month, day, and weekday. The control opens a drawer. The drawer lists bots. Its footer shows the username and a settings control that raises the settings card. The mark is the first character of the username. A Latin letter is uppercased. Until the username has loaded, the mark is blank.
 
 The unread control opens "Unread only". With nothing unread it is disabled and reads "All read". While that filter is on, the control steps aside and the filter row is how you leave it.
 
-Categories are a row of outlined chips. The selected chip fills with the accent. A card is an outlined rectangle: category, reading time, title, a two-line summary, source, and time. When there is an image, the thumbnail sits on the right. The article hero stays above the summary. Days are groups. Today is open. Earlier days start collapsed.
+There is no category row. A card is an outlined rectangle: reading time, title, a two-line summary, source, and time. When there is an image, the thumbnail sits on the right. The article hero stays above the summary. Days are groups. Today is open. Earlier days start collapsed. The app does not filter or label cards by category.
 
 ## Article
 
-The top bar sticks. Back is on the left. Category and time are in the center. Share is on the right. It hands the title, summary, body, source, and source links to the system share sheet. The other app receives that text. It is not a link back to the card. A reading progress line runs along the bottom edge. The body sits in an outlined card: image, title, summary, body, tags, source. Mark unread is an outlined button. Delete is a danger outline. The confirm button in the dialog is red with white text. The hero image is clipped to an 8px radius. The body renders Markdown.
+The top bar sticks. Back is on the left. The time is in the center. Share is on the right. It hands the title, summary, body, source, and source links to the system share sheet. The other app receives that text. It is not a link back to the card. A reading progress line runs along the bottom edge. The body sits in an outlined card: image, title, summary, body, tags, source. Mark unread is an outlined button. Delete is a danger outline. The confirm button in the dialog is red with white text. The hero image is clipped to an 8px radius. The body renders Markdown.
 
 ## Settings
 
-The feed pushes into Me. The profile card is a square avatar, the name, and "Edit". Three stats sit under it: bot count, unread count, cache window. "Reading" opens preferences, account, and bots. "More" is privacy and sign out. Back on a subpage returns to Me. Back on Me returns to the feed. The back tooltip is "Back".
-
-Preferences are appearance, language, unread only, cache, and auto sync. Dark and light apply immediately.
+The feed drawer opens bots directly. Its settings control raises a card from the bottom. The card holds appearance, language, unread only, cache, and auto sync, then account and privacy. Sign out is on that card. It does not list bots. Dark and light apply immediately. Account and privacy open their own pages. Back on those pages returns to the feed. The back tooltip is "Back".
 
 Account is a username field and its note: this is the login name, it must be unique, and it can be changed later. Save is a solid button aligned to the right. Saving keeps the session. The new name is the next login name.
 

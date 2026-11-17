@@ -105,6 +105,13 @@ FeedCard _card({
   );
 }
 
+Future<void> _openSettings(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('open-menu')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('settings')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('login page switches between sign in and register', (
     tester,
@@ -154,7 +161,9 @@ void main() {
     expect(find.text('有新内容时会出现在这里。'), findsOneWidget);
   });
 
-  testWidgets('category filter and detail delete', (tester) async {
+  testWidgets('feed lists every card and detail delete removes one', (
+    tester,
+  ) async {
     final client = FakeFeedClient([
       _card(id: 'a', title: '模型降价', category: '科技'),
       _card(id: 'b', title: '汇率波动', category: '财经', body: '美元走弱'),
@@ -166,15 +175,13 @@ void main() {
 
     expect(find.text('模型降价'), findsOneWidget);
     expect(find.text('汇率波动'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(TextButton, '财经'));
-    await tester.pumpAndSettle();
-    expect(find.text('汇率波动'), findsOneWidget);
-    expect(find.text('模型降价'), findsNothing);
+    expect(find.text('财经'), findsNothing);
+    expect(find.text('科技'), findsNothing);
 
     await tester.tap(find.text('汇率波动'));
     await tester.pumpAndSettle();
     expect(find.text('美元走弱'), findsOneWidget);
+    expect(find.text('财经'), findsNothing);
 
     await tester.ensureVisible(find.text('删除卡片'));
     await tester.pumpAndSettle();
@@ -184,7 +191,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(client.deleted, ['b']);
-    expect(find.text('本栏还没有卡片'), findsOneWidget);
+    expect(find.text('汇率波动'), findsNothing);
+    expect(find.text('模型降价'), findsOneWidget);
   });
 
   testWidgets(
@@ -388,9 +396,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No cards yet'), findsOneWidget);
     expect(find.text('New stories will appear here.'), findsOneWidget);
-    expect(find.byTooltip('Settings'), findsOneWidget);
+    expect(find.byTooltip('Open menu'), findsOneWidget);
     expect(find.text('EN'), findsNothing);
-    expect(find.text('ALL'), findsOneWidget);
+    expect(find.text('ALL'), findsNothing);
   });
 
   testWidgets('settings language toggle', (tester) async {
@@ -405,29 +413,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('settings')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('account-prefs')));
-    await tester.pumpAndSettle();
+    await _openSettings(tester);
     await tester.tap(find.byKey(const Key('lang-zh')));
     await tester.pumpAndSettle();
     expect(find.text('界面语言'), findsOneWidget);
-    await tester.tap(find.byTooltip('返回'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('返回'));
+    await tester.tap(find.byKey(const Key('close-settings')));
     await tester.pumpAndSettle();
     expect(find.text('还没有卡片'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('settings')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('account-prefs')));
-    await tester.pumpAndSettle();
+    await _openSettings(tester);
     await tester.tap(find.byKey(const Key('lang-en')));
     await tester.pumpAndSettle();
     expect(prefs.getString(LocaleController.key), 'en');
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Back'));
+    await tester.tap(find.byKey(const Key('close-settings')));
     await tester.pumpAndSettle();
     expect(find.text('No cards yet'), findsOneWidget);
   });
@@ -510,9 +508,7 @@ void main() {
     );
   });
 
-  testWidgets('unread filter inside a category keeps that category', (
-    tester,
-  ) async {
+  testWidgets('unread only hides cards already read', (tester) async {
     final client = FakeFeedClient([
       _card(id: 'a', title: '模型降价', category: '科技'),
       _card(id: 'b', title: '汇率波动', category: '财经'),
@@ -527,26 +523,19 @@ void main() {
     await tester.tap(find.byTooltip('返回信息流'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(TextButton, '财经'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('account-prefs')));
-    await tester.pumpAndSettle();
+    await _openSettings(tester);
     await tester.tap(find.byKey(const Key('unread-switch')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('返回'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('返回'));
+    await tester.tap(find.byKey(const Key('close-settings')));
     await tester.pumpAndSettle();
 
-    expect(find.text('没有未读卡片了'), findsOneWidget);
-    expect(find.text('本栏还没有卡片'), findsNothing);
+    expect(find.text('模型降价'), findsOneWidget);
+    expect(find.text('汇率波动'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('empty-action')));
+    await tester.tap(find.text('显示全部'));
     await tester.pumpAndSettle();
     expect(find.text('汇率波动'), findsOneWidget);
-    expect(find.text('模型降价'), findsNothing);
+    expect(find.text('模型降价'), findsOneWidget);
   });
 
   testWidgets('older day groups start collapsed', (tester) async {
@@ -617,15 +606,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('settings')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('account-prefs')));
-    await tester.pumpAndSettle();
+    await _openSettings(tester);
     await tester.tap(find.byKey(const Key('unread-switch')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('返回'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('返回'));
+    await tester.tap(find.byKey(const Key('close-settings')));
     await tester.pumpAndSettle();
 
     expect(find.text('只看未读 · 2'), findsOneWidget);
@@ -641,7 +625,7 @@ void main() {
     expect(find.text('没有未读卡片了'), findsOneWidget);
   });
 
-  testWidgets('masthead avatar follows the username', (tester) async {
+  testWidgets('drawer avatar follows the username', (tester) async {
     await tester.pumpWidget(
       ProclanApp(
         locale: const Locale('zh'),
@@ -654,18 +638,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('open-menu')));
+    await tester.pumpAndSettle();
 
-    expect(
-      tester
-          .widget<Text>(
-            find.descendant(
-              of: find.byKey(const Key('settings')),
-              matching: find.byType(Text),
-            ),
-          )
-          .data,
-      '林',
-    );
+    expect(tester.widget<Text>(find.byKey(const Key('drawer-avatar'))).data, '林');
   });
 
   testWidgets('bots page copies an mcp setup prompt', (tester) async {
@@ -681,9 +657,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings')));
+    await tester.tap(find.byKey(const Key('open-menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Bot 与接入'));
+    await tester.tap(find.byKey(const Key('drawer-bots')));
     await tester.pumpAndSettle();
 
     expect(find.text('复制 MCP 安装提示词'), findsOneWidget);
@@ -733,9 +709,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings')));
+    await tester.tap(find.byKey(const Key('open-menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Bots and access'));
+    await tester.tap(find.byKey(const Key('drawer-bots')));
     await tester.pumpAndSettle();
 
     expect(find.text('Copy MCP install prompt'), findsOneWidget);
@@ -790,9 +766,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('settings')));
+    await tester.tap(find.byKey(const Key('open-menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Bot 与接入'));
+    await tester.tap(find.byKey(const Key('drawer-bots')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('bot-日报')), findsOneWidget);
@@ -867,8 +843,8 @@ void main() {
 
     await tester.tap(find.byTooltip('返回'));
     await tester.pumpAndSettle();
-    expect(find.text('编辑资料'), findsOneWidget);
-    expect(tester.widget<Text>(find.byKey(const Key('stat-bots'))).data, '1');
+    expect(find.text('复制 MCP 安装提示词'), findsNothing);
+    expect(find.byKey(const Key('open-menu')), findsOneWidget);
   });
 }
 

@@ -2,7 +2,7 @@ English | [中文](README.zh.md)
 
 # Proclan app
 
-Flutter client for the announcement wall. It reads cards, filters by category, opens an article, and deletes after confirmation.
+Flutter client for the announcement wall. It reads cards, opens an article, and deletes after confirmation.
 
 From the repository root, `./scripts/run` starts the app and `./scripts/apk` builds the release APK. The server install is [../server/DEPLOY.md](../server/DEPLOY.md). Do not compile the app on the server.
 
