@@ -6,7 +6,7 @@ Flutter client for the announcement wall. It reads cards, opens an article, and 
 
 From the repository root, `./scripts/run` starts the app and `./scripts/apk` builds the release APK. The server install is [../server/DEPLOY.md](../server/DEPLOY.md). Do not compile the app on the server.
 
-`app/.env` holds `API_BASE` only. Copy `app/.env.example` and set that origin. Do not put a token in the file, and do not hardcode the address in source.
+`app/.env` holds `API_BASE` only. Copy `app/.env.example` and set that origin. `./scripts/run dev` reads `app/.env.development`. `./scripts/run production` reads `app/.env.production`. The same word works after `./scripts/apk`. A bare command still reads `app/.env`. Create those files on the machine. Do not commit them. Do not put a token in any of them, and do not hardcode the address in source.
 
 Sign in with the username and password created on the server.
 

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import 'account_api.dart';
 import 'chrome.dart';
+import 'community_api.dart';
+import 'community_page.dart';
 import 'detail_page.dart';
 import 'feed_client.dart';
 import 'l10n/app_localizations.dart';
@@ -16,6 +18,7 @@ class AccountPage extends StatefulWidget {
     required this.open,
     this.account,
     this.feed,
+    this.community,
     this.onCardOpened,
     this.onCardResult,
     this.onLogout,
@@ -24,6 +27,7 @@ class AccountPage extends StatefulWidget {
   final AccountOpen open;
   final AccountClient? account;
   final FeedClient? feed;
+  final CommunityClient? community;
   final void Function(FeedCard card)? onCardOpened;
   final void Function(FeedCard card, DetailResult result)? onCardResult;
   final Future<void> Function()? onLogout;
@@ -44,6 +48,8 @@ class _AccountPageState extends State<AccountPage> {
   var _tokenShown = false;
   var _busy = false;
   List<String> _bots = const [];
+  List<CommunityGroup> _followed = const [];
+  final _treeCollapsed = <String, bool>{};
   String? _botName;
   BotProfile? _botProfile;
 
@@ -56,6 +62,7 @@ class _AccountPageState extends State<AccountPage> {
       AccountOpen.privacy => _AccountScreen.privacy,
     };
     _loadAccount();
+    _loadFollowing();
   }
 
   @override
@@ -81,6 +88,20 @@ class _AccountPageState extends State<AccountPage> {
         _username.text = user.username;
         _bots = bots;
       });
+    } catch (_) {}
+  }
+
+  Future<void> _loadFollowing() async {
+    final community = widget.community;
+    if (community == null) {
+      return;
+    }
+    try {
+      final groups = await community.following();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _followed = groups);
     } catch (_) {}
   }
 
@@ -291,6 +312,43 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
+  void _toggleTree(String id) {
+    setState(() => _treeCollapsed[id] = !(_treeCollapsed[id] ?? false));
+  }
+
+  void _openFollowed(String ownerId, String name) {
+    final community = widget.community;
+    if (community == null) {
+      return;
+    }
+    Navigator.push<void>(
+      context,
+      PageRouteBuilder<void>(
+        pageBuilder: (_, _, _) => CommunityPage(
+          client: community,
+          feed: widget.feed,
+          copiesOwnerId: ownerId,
+          copiesName: name,
+          onCardOpened: widget.onCardOpened,
+          onCardResult: widget.onCardResult,
+        ),
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        transitionsBuilder: (_, animation, _, child) {
+          final offset = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: animation, curve: Red.ease));
+          return SlideTransition(position: offset, child: child);
+        },
+      ),
+    ).then((_) {
+      if (mounted) {
+        _loadFollowing();
+      }
+    });
+  }
+
   Future<void> _openCard(FeedCard card) async {
     final feed = widget.feed;
     if (feed == null) {
@@ -323,8 +381,63 @@ class _AccountPageState extends State<AccountPage> {
           for (final item in profile.cards)
             if (item.id != card.id) item,
         ],
+        listed: profile.listed,
+        code: profile.code,
+        likes: profile.likes,
+        dislikes: profile.dislikes,
+        follows: profile.follows,
       );
     });
+  }
+
+  Future<void> _setShared(bool next) async {
+    final name = _botName;
+    final account = _account;
+    if (name == null || account == null) {
+      return;
+    }
+    if (!next) {
+      final l = AppLocalizations.of(context);
+      final ok = await _confirm(
+        context,
+        title: l.communityShareStopTitle,
+        body: l.communityShareStopBody,
+        action: l.communityShareStop,
+      );
+      if (!ok || !mounted) {
+        return;
+      }
+    }
+    await _run(() async {
+      if (next) {
+        await account.shareBot(name);
+      } else {
+        await account.unshareBot(name);
+      }
+      final profile = await account.botProfile(name);
+      if (!mounted || _botName != name) {
+        return;
+      }
+      setState(() => _botProfile = profile);
+      showRedNotice(
+        context,
+        next
+            ? AppLocalizations.of(context).communitySharedDone
+            : AppLocalizations.of(context).communityUnsharedDone,
+      );
+    });
+  }
+
+  Future<void> _copyCode() async {
+    final code = _botProfile?.code ?? '';
+    if (code.isEmpty) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: code));
+    if (!mounted) {
+      return;
+    }
+    showRedNotice(context, AppLocalizations.of(context).communityCopied);
   }
 
   Future<void> _deleteBot() async {
@@ -458,48 +571,67 @@ class _AccountPageState extends State<AccountPage> {
                       _Block(
                         title: l.bots,
                         note: l.botsNote,
-                        child: _bots.isEmpty
-                            ? Text(
-                                l.botsEmpty,
-                                style: Red.text(size: 14, height: 1.5),
-                              )
-                            : Column(
-                                children: [
-                                  for (final name in _bots)
-                                    InkWell(
-                                      key: Key('bot-$name'),
-                                      onTap: _busy
-                                          ? null
-                                          : () => _openBot(name),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            _Initial(text: name),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                name,
-                                                style: Red.text(
-                                                  size: 14,
-                                                  height: 1.4,
-                                                  weight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ),
-                                            Icon(
-                                              Icons.chevron_right,
-                                              size: 16,
-                                              color: Red.meta,
-                                            ),
-                                          ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _BotTreeGroup(
+                              label: l.botsMine,
+                              count: _bots.length,
+                              collapsed: _treeCollapsed['mine'] ?? false,
+                              onToggle: () => _toggleTree('mine'),
+                              children: _bots.isEmpty
+                                  ? [
+                                      Text(
+                                        l.botsEmpty,
+                                        style: Red.text(
+                                          size: 12,
+                                          height: 1.5,
+                                          color: Red.meta,
                                         ),
                                       ),
+                                    ]
+                                  : [
+                                      for (final name in _bots)
+                                        _BotTreeRow(
+                                          key: Key('bot-$name'),
+                                          name: name,
+                                          onTap: _busy ? null : () => _openBot(name),
+                                        ),
+                                    ],
+                            ),
+                            for (final group in _followed)
+                              _BotTreeGroup(
+                                label: group.ownerName,
+                                count: group.bots.length,
+                                collapsed:
+                                    _treeCollapsed['owner:${group.ownerId}'] ??
+                                    false,
+                                onToggle: () =>
+                                    _toggleTree('owner:${group.ownerId}'),
+                                labelKey: Key('community-user-${group.ownerId}'),
+                                children: [
+                                  for (final bot in group.bots)
+                                    _BotTreeRow(
+                                      key: Key('followed-${group.ownerId}-${bot.name}'),
+                                      name: bot.name,
+                                      status: bot.listed ? null : l.communityOffline,
+                                      onTap: () => _openFollowed(group.ownerId, bot.name),
                                     ),
                                 ],
                               ),
+                            if (widget.community != null) ...[
+                              const SizedBox(height: 14),
+                              Text(
+                                l.botsTreeNote,
+                                style: Red.text(
+                                  size: 11.5,
+                                  height: 1.55,
+                                  color: Red.meta,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       DecoratedBox(
@@ -583,6 +715,8 @@ class _AccountPageState extends State<AccountPage> {
                         busy: _busy,
                         onDelete: _deleteBot,
                         onOpen: _openCard,
+                        onShare: _setShared,
+                        onCopyCode: _copyCode,
                       ),
                     if (_screen == _AccountScreen.privacy) _PrivacyBody(),
                   ],
@@ -629,12 +763,16 @@ class _BotBody extends StatelessWidget {
     required this.busy,
     required this.onDelete,
     required this.onOpen,
+    required this.onShare,
+    required this.onCopyCode,
   });
 
   final BotProfile profile;
   final bool busy;
   final VoidCallback onDelete;
   final ValueChanged<FeedCard> onOpen;
+  final ValueChanged<bool> onShare;
+  final VoidCallback onCopyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -680,6 +818,95 @@ class _BotBody extends StatelessWidget {
           ),
         ),
         _Block(
+          title: l.communityShare,
+          note: l.communityShareNote,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: Red.borderSoft)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              profile.listed ? l.communityShared : l.communityNotShared,
+                              style: Red.text(size: 14, height: 1.35, weight: FontWeight.w500),
+                            ),
+                            if (profile.code.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                '${l.communityCode} ${profile.code} · ${profile.likes} ${l.communityLike} · ${profile.follows} ${l.communityFollowerCount}',
+                                style: Red.text(size: 11, height: 1.45, color: Red.muted),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Switch(
+                        key: const Key('share-community'),
+                        value: profile.listed,
+                        onChanged: busy ? null : onShare,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (profile.code.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Red.surfaceWarm,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Red.border),
+                  ),
+                  child: SizedBox(
+                    height: 44,
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 12),
+                        Text(
+                          l.communityCode.toUpperCase(),
+                          style: Red.text(
+                            size: 9.5,
+                            height: 1.3,
+                            letterSpacing: 1,
+                            color: Red.meta,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            profile.code,
+                            key: const Key('community-code'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Red.text(
+                              size: 13,
+                              height: 1.3,
+                              letterSpacing: 0.8,
+                              color: Red.fg2,
+                              tabular: true,
+                            ),
+                          ),
+                        ),
+                        _TextAction(label: l.communityCopy, onPressed: onCopyCode),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        _Block(
           title: l.botLatest,
           child: cards.isEmpty
               ? Text(l.botLatestEmpty, style: Red.text(size: 14, height: 1.5))
@@ -720,6 +947,133 @@ class _BotBody extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _BotTreeGroup extends StatelessWidget {
+  const _BotTreeGroup({
+    required this.label,
+    required this.count,
+    required this.collapsed,
+    required this.onToggle,
+    required this.children,
+    this.labelKey,
+  });
+
+  final String label;
+  final int count;
+  final bool collapsed;
+  final VoidCallback onToggle;
+  final List<Widget> children;
+  final Key? labelKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  AnimatedRotation(
+                    turns: collapsed ? -0.25 : 0,
+                    duration: const Duration(milliseconds: 150),
+                    curve: Red.ease,
+                    child: Icon(Icons.keyboard_arrow_down, size: 14, color: Red.meta),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label.toUpperCase(),
+                      key: labelKey,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Red.text(
+                        size: 11,
+                        height: 1.4,
+                        letterSpacing: 1,
+                        color: Red.muted,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$count',
+                    style: Red.text(size: 11, height: 1.4, color: Red.meta, tabular: true),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (!collapsed)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: Red.border)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 9),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BotTreeRow extends StatelessWidget {
+  const _BotTreeRow({
+    super.key,
+    required this.name,
+    required this.onTap,
+    this.status,
+  });
+
+  final String name;
+  final VoidCallback? onTap;
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 52),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Red.text(size: 14, height: 1.4, weight: FontWeight.w500),
+                ),
+              ),
+              if (status != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  status!,
+                  style: Red.text(size: 10.5, height: 1.4, color: Red.meta),
+                ),
+              ],
+              const SizedBox(width: 10),
+              Icon(Icons.chevron_right, size: 16, color: Red.meta),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

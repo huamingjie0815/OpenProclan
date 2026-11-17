@@ -1,0 +1,112 @@
+"""Community routes. Sharing, follows, votes, boards, and search."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
+
+from proclan_server.config import Settings
+from proclan_server.store import CommunityError, Store
+
+
+class _Name(BaseModel):
+    name: str
+
+
+class _Target(BaseModel):
+    owner_id: str
+    name: str
+
+
+class _Vote(BaseModel):
+    owner_id: str
+    name: str
+    vote: int
+
+
+def register_community(
+    app: FastAPI,
+    store: Store,
+    settings: Settings,
+    card_json: Callable,
+    cutoff,
+) -> None:
+    def fail(action):
+        try:
+            return action()
+        except CommunityError as exc:
+            raise HTTPException(exc.status, exc.detail) from exc
+
+    @app.post("/v1/community/share")
+    def share(request: Request, body: _Name) -> dict:
+        return fail(lambda: store.share_bot(request.state.user_id, body.name))
+
+    @app.delete("/v1/community/share")
+    def unshare(request: Request, name: str) -> dict:
+        return fail(lambda: store.unshare_bot(request.state.user_id, name))
+
+    @app.post("/v1/community/follow", status_code=204)
+    def follow(request: Request, body: _Target) -> None:
+        fail(lambda: store.follow_bot(request.state.user_id, body.owner_id, body.name))
+
+    @app.delete("/v1/community/follow", status_code=204)
+    def unfollow(request: Request, owner_id: str, name: str) -> None:
+        store.unfollow_bot(request.state.user_id, owner_id, name)
+
+    @app.post("/v1/community/vote", status_code=204)
+    def vote(request: Request, body: _Vote) -> None:
+        fail(
+            lambda: store.vote_bot(
+                request.state.user_id,
+                body.owner_id,
+                body.name,
+                body.vote,
+            )
+        )
+
+    @app.get("/v1/community/board")
+    def board(kind: str = "likes") -> dict:
+        if kind not in {"likes", "follows"}:
+            raise HTTPException(400, "bad board")
+        return {"bots": store.community_board(kind)}
+
+    @app.get("/v1/community/search")
+    def search(q: str = "") -> dict:
+        return {"bots": store.community_search(q)}
+
+    @app.get("/v1/community/bot")
+    def bot(request: Request, owner_id: str, name: str) -> dict:
+        found = fail(
+            lambda: store.community_detail(
+                request.state.user_id,
+                owner_id,
+                name,
+                not_before=cutoff(settings),
+            )
+        )
+        card = found.pop("card")
+        if card is not None:
+            card.source_username = found["owner_name"]
+            found["card"] = card_json(card, request)
+        else:
+            found["card"] = None
+        return found
+
+    @app.get("/v1/community/following")
+    def following(request: Request) -> dict:
+        return {"users": store.community_following(request.state.user_id)}
+
+    @app.get("/v1/community/copies")
+    def copies(request: Request, owner_id: str, name: str) -> dict:
+        found = fail(
+            lambda: store.community_copies(
+                request.state.user_id,
+                owner_id,
+                name,
+                not_before=cutoff(settings),
+            )
+        )
+        found["cards"] = [card_json(card, request) for card in found["cards"]]
+        return found

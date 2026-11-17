@@ -366,6 +366,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Names come from the bot field on submitted cards. Delete one, and the same name returns on the next push.';
 
   @override
+  String get botsMine => 'Mine';
+
+  @override
+  String get botsTreeNote =>
+      'Bots you follow from the community are grouped by author here. Open one to see the cards it has sent.';
+
+  @override
   String get botProfile => 'Basics';
 
   @override
@@ -393,7 +400,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get botDeleteBody =>
-      'This only removes the name from the list. Cards you already have stay. The same name comes back the next time it pushes.';
+      'This only removes the name from the list. Cards you already have stay. Sharing to the community stops, and the short code stays. The same name comes back the next time it pushes.';
 
   @override
   String get botMissing => 'This bot is no longer in the list.';
@@ -445,7 +452,149 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyText =>
-      'Your cards and read state stay on your server and this device.';
+      'Your cards and read state stay on your server and this device. When you share a bot to this server\'s community, other accounts can read the latest card that bot still has. After you stop sharing, an account that knows the code can still read that latest card.';
+
+  @override
+  String get community => 'Community';
+
+  @override
+  String get communityLikes => 'Likes';
+
+  @override
+  String get communityFollows => 'Follows';
+
+  @override
+  String get communityFollowing => 'Following';
+
+  @override
+  String get communitySearchLabel => 'Search community';
+
+  @override
+  String get communitySearchHint => 'Search bots, names, or a code';
+
+  @override
+  String get communityClear => 'Clear search';
+
+  @override
+  String communityResults(String q, int count) {
+    return '“$q” · $count results';
+  }
+
+  @override
+  String get communitySortLikes => 'Sorted by likes';
+
+  @override
+  String get communitySortFollows => 'Sorted by followers';
+
+  @override
+  String get communityEmpty =>
+      'No bot has been shared to this server\'s community.';
+
+  @override
+  String communityEmptySearch(String q) {
+    return 'No bot matches “$q”. Try another name or short code.';
+  }
+
+  @override
+  String get communityOffline => 'Offline';
+
+  @override
+  String get communityFollow => 'Follow';
+
+  @override
+  String get communityFollowingLabel => 'Following';
+
+  @override
+  String get communityUnfollowTitle => 'Unfollow?';
+
+  @override
+  String get communityUnfollowBody =>
+      'New cards from this bot will stop. Cards you already received stay in your feed.';
+
+  @override
+  String get communityUnfollow => 'Unfollow';
+
+  @override
+  String get communityLike => 'Like';
+
+  @override
+  String get communityDislike => 'Dislike';
+
+  @override
+  String get communityFollowerCount => 'Followers';
+
+  @override
+  String get communityCode => 'Code';
+
+  @override
+  String get communityCopy => 'Copy';
+
+  @override
+  String get communityCopied => 'Code copied';
+
+  @override
+  String get communityLatest => 'Latest card';
+
+  @override
+  String get communityAllCards => 'All cards';
+
+  @override
+  String get communityOpenBot => 'Bot profile';
+
+  @override
+  String get communityMine => 'My bot';
+
+  @override
+  String get communityShare => 'Community sharing';
+
+  @override
+  String get communityShareNote =>
+      'When shared, this bot appears on the community boards and others can follow it for new cards.';
+
+  @override
+  String get communityShared => 'Shared to community';
+
+  @override
+  String get communityNotShared => 'Not shared';
+
+  @override
+  String get communityShareStopTitle => 'Stop sharing?';
+
+  @override
+  String get communityShareStopBody =>
+      'This bot leaves the boards, and followers stop receiving new cards. The code stays.';
+
+  @override
+  String get communityShareStop => 'Stop sharing';
+
+  @override
+  String get communitySharedDone => 'Shared to community';
+
+  @override
+  String get communityUnsharedDone => 'Sharing stopped';
+
+  @override
+  String get communityFollowed => 'Following';
+
+  @override
+  String get communityUnfollowed => 'Unfollowed';
+
+  @override
+  String get communityBoardNote =>
+      'Boards count only bots shared to this server.';
+
+  @override
+  String get communityBack => 'Back';
+
+  @override
+  String get communityGuestEmpty =>
+      'No card from this bot is still on the server.';
+
+  @override
+  String get communityOpen => 'Community page';
+
+  @override
+  String get communityCopiesEmpty => 'No card from this bot has arrived yet.';
 
   @override
   String get logout => 'Log out';

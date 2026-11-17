@@ -4,7 +4,7 @@
 .vscode/
 *.iml
 
-# Secrets. Keep server/.env.example.
+# Secrets and local origins. Keep *.env.example.
 .env
 .env.*
 !.env.example

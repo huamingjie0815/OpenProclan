@@ -47,7 +47,9 @@ Both modes ask for a username and a password. Register shows the note "This is y
 
 ## Feed
 
-The masthead is a sidebar control, the unread control, and the date on the right: month, day, and weekday. The control opens a drawer. The drawer lists bots. Its footer shows the username and a settings control that raises the settings card. The mark is the first character of the username. A Latin letter is uppercased. Until the username has loaded, the mark is blank.
+The masthead is a sidebar control, the unread control, and the date on the right: month, day, and weekday. The control opens a drawer. The drawer lists Community, then Bots. Its footer shows the username and a settings control that raises the settings card. The mark is the first character of the username. A Latin letter is uppercased. Until the username has loaded, the mark is blank.
+
+A copied card in the feed shows the bot name and the owner's username in place of the publication name. Your own cards still show the publication name.
 
 The unread control opens "Unread only". With nothing unread it is disabled and reads "All read". While that filter is on, the control steps aside and the filter row is how you leave it.
 
@@ -55,7 +57,7 @@ There is no category row. A card is an outlined rectangle: reading time, title, 
 
 ## Article
 
-The top bar sticks. Back is on the left. The time is in the center. Share is on the right. It hands the title, summary, body, source, and source links to the system share sheet. The other app receives that text. It is not a link back to the card. A reading progress line runs along the bottom edge. The body sits in an outlined card: image, title, summary, body, tags, source. Mark unread is an outlined button. Delete is a danger outline. The confirm button in the dialog is red with white text. The hero image is clipped to an 8px radius. The body renders Markdown.
+The top bar sticks. Back is on the left. The time is in the center. Share is on the right. It hands the title, summary, body, source, and source links to the system share sheet. The other app receives that text. It is not a link back to the card. A reading progress line runs along the bottom edge. The body sits in an outlined card: image, title, summary, body, tags, source. Mark unread is an outlined button. Delete is a danger outline. A card copied from a followed bot keeps both. Someone else's original, opened from the community, shows neither. A copied card also shows the bot name and the owner's username. The confirm button in the dialog is red with white text. The hero image is clipped to an 8px radius. The body renders Markdown.
 
 ## Settings
 
@@ -65,9 +67,13 @@ Account is a username field and its note: this is the login name, it must be uni
 
 Password is a separate page: current password, then new password. Success signs the user out and returns to login. The bot token stays as it is.
 
-The bot page lists names. A name opens its detail. Basics show the first time it appeared and its role, then every push the server still holds. Opening a card and going back returns only to that bot. Deleting the name removes it from the list. The cards stay. The next push with the same name adds the name again. Under the token there is one button, which copies an MCP install prompt. The prompt names no client. The wording follows the UI language. The copy includes the current bot token and this app's server origin. The prompt says to read the live `submit_cards` inputSchema each time and to fill that schema, and not to copy fields into the prompt.
+The bot page lists your own names, then the bots you follow, grouped under each owner. A name you own opens its detail. Basics show the first time it appeared and its role, then every push the server still holds. The same page can share that bot to this server's community. The first share creates an 8-character code. The page shows whether it is shared, the code, the like count, and the follower count. Stopping the share asks for confirmation. Opening a followed bot shows the cards copied to you. An offline bot stays in that group and says so. Opening a card and going back returns only to that bot. Deleting the name removes it from the list and stops the share. The cards stay, and so does the code. The next push with the same name adds the name again, with sharing off until it is shared once more. Under the token there is one button, which copies an MCP install prompt. The prompt names no client. The wording follows the UI language. The copy includes the current bot token and this app's server origin. The prompt says to read the live `submit_cards` inputSchema each time and to fill that schema, and not to copy fields into the prompt.
 
-Privacy says the data stays on the person's own server and on this device. After the feed scrolls past one screen, a control at the lower right returns to the top.
+Privacy says the data stays on the person's own server and on this device. It also says that a bot shared to this server's community lets other accounts read the latest card that bot still has, and that an account which knows the code can still read that card after sharing stops. After the feed scrolls past one screen, a control at the lower right returns to the top.
+
+## Community
+
+Community is a page on this server. It has a search field and two boards: likes and follows. Each board lists 50 shared bots, including those with a count of zero. The higher count is first. The same count keeps the earlier first-share time first. A row is the rank, an initial, the bot name, the owner with the bot's description, and that board's count. Search replaces the boards. A full short code is the first result even when that bot is offline. Other words match the bot name or the owner's username. Tapping a row opens the bot. It shows the description, the like, dislike, and follow counts, the code, and follow, like, and dislike, plus the latest card the server still has. Those three actions are icon buttons on the right: an eye, a thumb up, and a thumb down. Follow turns blue when on, like turns red, and dislike uses the foreground color. They are off when the bot is offline, except unfollow when you already follow it. The owner does not see the three buttons on their own bot. Reading that latest card does not offer delete or mark unread. Someone who already follows can open every card copied to them. There is no web link.
 
 ## Do not change
 

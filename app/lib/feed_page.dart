@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'account_api.dart';
 import 'account_page.dart';
 import 'chrome.dart';
+import 'community_api.dart';
+import 'community_page.dart';
 import 'detail_page.dart';
 import 'feed_client.dart';
 import 'inbox.dart';
@@ -24,6 +26,7 @@ class FeedPage extends StatefulWidget {
     this.onTheme,
     this.prefs,
     this.account,
+    this.community,
     this.onLogout,
   });
 
@@ -34,6 +37,7 @@ class FeedPage extends StatefulWidget {
   final ValueChanged<bool>? onTheme;
   final SharedPreferences? prefs;
   final AccountClient? account;
+  final CommunityClient? community;
   final Future<void> Function()? onLogout;
 
   @override
@@ -449,6 +453,7 @@ class _FeedPageState extends State<FeedPage> {
           open: open,
           account: widget.account,
           feed: widget.client,
+          community: widget.community,
           onCardOpened: (card) => _markRead(card.id),
           onCardResult: _applyDetailResult,
           onLogout: widget.onLogout,
@@ -468,6 +473,35 @@ class _FeedPageState extends State<FeedPage> {
         _loadUser();
       }
     });
+  }
+
+  void _openCommunity() {
+    final community = widget.community;
+    if (community == null) {
+      setState(() => _drawerOpen = false);
+      return;
+    }
+    setState(() => _drawerOpen = false);
+    Navigator.push<void>(
+      context,
+      PageRouteBuilder<void>(
+        pageBuilder: (_, _, _) => CommunityPage(
+          client: community,
+          feed: widget.client,
+          onCardOpened: (card) => _markRead(card.id),
+          onCardResult: _applyDetailResult,
+        ),
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        transitionsBuilder: (_, animation, _, child) {
+          final offset = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: animation, curve: Red.ease));
+          return SlideTransition(position: offset, child: child);
+        },
+      ),
+    );
   }
 
   void _openSettings() {
@@ -521,6 +555,7 @@ class _FeedPageState extends State<FeedPage> {
                 mark: _avatarMark,
                 onClose: () => setState(() => _drawerOpen = false),
                 onBots: () => _openAccount(AccountOpen.bots),
+                onCommunity: _openCommunity,
                 onSettings: _openSettings,
               ),
             ),
@@ -975,7 +1010,9 @@ class _CardState extends State<_Card> {
                             ],
                             Expanded(
                               child: Text(
-                                card.source.toUpperCase(),
+                                card.sourceUsername.isEmpty
+                                    ? card.source.toUpperCase()
+                                    : '${card.createdBot} · ${card.sourceUsername}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: Red.text(
@@ -1209,6 +1246,7 @@ class _FeedDrawer extends StatelessWidget {
     required this.mark,
     required this.onClose,
     required this.onBots,
+    required this.onCommunity,
     required this.onSettings,
   });
 
@@ -1216,6 +1254,7 @@ class _FeedDrawer extends StatelessWidget {
   final String mark;
   final VoidCallback onClose;
   final VoidCallback onBots;
+  final VoidCallback onCommunity;
   final VoidCallback onSettings;
 
   @override
@@ -1283,6 +1322,29 @@ class _FeedDrawer extends StatelessWidget {
                                 ],
                               ),
                             ),
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('drawer-community'),
+                          onPressed: onCommunity,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Red.fg2,
+                            alignment: Alignment.centerLeft,
+                            minimumSize: const Size.fromHeight(48),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.groups_outlined, size: 18),
+                              const SizedBox(width: 12),
+                              Text(
+                                l.community,
+                                style: Red.text(size: 14, height: 1.4),
+                              ),
+                            ],
                           ),
                         ),
                         TextButton(

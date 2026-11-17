@@ -16,6 +16,7 @@ class FeedCard {
     required this.createdBot,
     required this.read,
     required this.createdAt,
+    this.sourceUsername = '',
   });
 
   final String id;
@@ -35,6 +36,9 @@ class FeedCard {
   final bool read;
   final String createdAt;
 
+  /// Owner of a copied card, or of a community preview. Empty for your own cards.
+  final String sourceUsername;
+
   factory FeedCard.fromJson(Map<String, dynamic> json) {
     return FeedCard(
       id: json['id'] as String,
@@ -50,6 +54,7 @@ class FeedCard {
       createdBot: json['created_bot'] as String? ?? '',
       read: json['read'] as bool? ?? false,
       createdAt: json['created_at'] as String? ?? '',
+      sourceUsername: json['source_username'] as String? ?? '',
     );
   }
 
@@ -66,6 +71,7 @@ class FeedCard {
       'source_urls': sourceUrls,
       'created_bot': createdBot,
       'created_at': createdAt,
+      'source_username': sourceUsername,
     };
   }
 }

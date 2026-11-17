@@ -356,6 +356,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get botsNote => '名称来自提交卡片时填写的 bot。删掉后，下次用同一名称推送会再出现。';
 
   @override
+  String get botsMine => '我的';
+
+  @override
+  String get botsTreeNote => '从社区关注的 Bot 会按作者分组显示在这里，点开可以查看收到的卡片。';
+
+  @override
   String get botProfile => '基本信息';
 
   @override
@@ -380,7 +386,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get botDeleteTitle => '删除这个 bot？';
 
   @override
-  String get botDeleteBody => '只从列表去掉这个名字。已经收到的卡片还在。下次用同一名称推送时，会再出现在这里。';
+  String get botDeleteBody =>
+      '只从列表去掉这个名字。已经收到的卡片还在。分享到社区会停下来，短码还留着。下次用同一名称推送时，会再出现在这里。';
 
   @override
   String get botMissing => '这个 bot 已经不在列表里。';
@@ -430,7 +437,144 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privacyEmpty => '这里还没有可以调整的项目。';
 
   @override
-  String get privacyText => '你的卡片和已读状态都保存在自己的服务与这台设备上。';
+  String get privacyText =>
+      '你的卡片和已读状态都保存在自己的服务与这台设备上。分享到这台服务器社区的 bot，其他账号可以阅读它最新一张还在的卡片。撤下之后，知道短码的账号仍可以阅读这张最新卡片。';
+
+  @override
+  String get community => '社区';
+
+  @override
+  String get communityLikes => '点赞榜';
+
+  @override
+  String get communityFollows => '关注榜';
+
+  @override
+  String get communityFollowing => '我的关注';
+
+  @override
+  String get communitySearchLabel => '搜索社区';
+
+  @override
+  String get communitySearchHint => '搜索 Bot、作者或短码';
+
+  @override
+  String get communityClear => '清除搜索';
+
+  @override
+  String communityResults(String q, int count) {
+    return '“$q” · $count 个结果';
+  }
+
+  @override
+  String get communitySortLikes => '按点赞数排序';
+
+  @override
+  String get communitySortFollows => '按关注数排序';
+
+  @override
+  String get communityEmpty => '还没有 Bot 分享到这个服务端的社区。';
+
+  @override
+  String communityEmptySearch(String q) {
+    return '没有找到“$q”相关的 Bot，换个名称或短码试试。';
+  }
+
+  @override
+  String get communityOffline => '已下线';
+
+  @override
+  String get communityFollow => '关注';
+
+  @override
+  String get communityFollowingLabel => '已关注';
+
+  @override
+  String get communityUnfollowTitle => '取消关注？';
+
+  @override
+  String get communityUnfollowBody => '之后不再收到这个 Bot 的新卡片。已经收到的卡片还留在信息流里。';
+
+  @override
+  String get communityUnfollow => '取消关注';
+
+  @override
+  String get communityLike => '点赞';
+
+  @override
+  String get communityDislike => '差评';
+
+  @override
+  String get communityFollowerCount => '关注';
+
+  @override
+  String get communityCode => '短码';
+
+  @override
+  String get communityCopy => '复制';
+
+  @override
+  String get communityCopied => '短码已复制';
+
+  @override
+  String get communityLatest => '最近卡片';
+
+  @override
+  String get communityAllCards => '全部卡片';
+
+  @override
+  String get communityOpenBot => 'Bot 资料';
+
+  @override
+  String get communityMine => '我的 Bot';
+
+  @override
+  String get communityShare => '社区分享';
+
+  @override
+  String get communityShareNote => '分享后，这个 Bot 会出现在社区榜单，其他人可以关注并收到新卡片。';
+
+  @override
+  String get communityShared => '已分享到社区';
+
+  @override
+  String get communityNotShared => '未分享';
+
+  @override
+  String get communityShareStopTitle => '停止分享？';
+
+  @override
+  String get communityShareStopBody => '这个 Bot 会从榜单消失，关注它的人不再收到新卡片。短码还在。';
+
+  @override
+  String get communityShareStop => '停止分享';
+
+  @override
+  String get communitySharedDone => '已分享到社区';
+
+  @override
+  String get communityUnsharedDone => '已停止分享';
+
+  @override
+  String get communityFollowed => '已关注';
+
+  @override
+  String get communityUnfollowed => '已取消关注';
+
+  @override
+  String get communityBoardNote => '榜单只统计分享到这个服务端的 Bot。';
+
+  @override
+  String get communityBack => '返回';
+
+  @override
+  String get communityGuestEmpty => '服务端没有这个 Bot 还留着的卡片。';
+
+  @override
+  String get communityOpen => '社区页';
+
+  @override
+  String get communityCopiesEmpty => '还没有收到这个 Bot 的卡片。';
 
   @override
   String get logout => '退出登录';

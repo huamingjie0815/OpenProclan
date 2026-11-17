@@ -65,7 +65,7 @@ If the public curl fails but loopback `/openapi.json` returns 200 and the proxy 
 - Connection name `Proclan`. Auth is the static header `Authorization: Bearer <the person's bot token>`, not OAuth. Copy the token from the app's bot page. Do not generate one. Do not write it into `app/.env`.
 - Database file name `proclan.sqlite3`
 
-There is no global ingest token. The app build needs `API_BASE` only. The bot token lives only in that person's MCP connection header. Do not write it into the repository, a commit, a prompt, a routine, or a skill. Do not commit either `.env`.
+There is no global ingest token. The app build needs `API_BASE` only. The bot token lives only in that person's MCP connection header. Do not write it into the repository, a commit, a prompt, a routine, or a skill. Do not commit `app/.env`, `app/.env.development`, `app/.env.production`, or `server/.env`.
 
 Open ports 80 and 443 only. Leave `8787` on the machine for the reverse proxy.
 
@@ -88,6 +88,18 @@ cd /opt/proclan/server && uv run python -m proclan_server.set_password <username
 The same ASCII case-insensitive lookup applies. The command stores an argon2id hash, deletes that user's sessions, and does not rotate the bot token. It exits non-zero when the username does not exist.
 
 Ten failed logins lock the account for 15 minutes. A session lasts 30 days.
+
+### Community
+
+Community is among the accounts on this server. The session token is used. The bot token is not.
+
+The owner shares one bot at a time from that bot's page. The first share creates an 8-character code. Stopping the share takes the bot off both boards and pauses copies to followers. Follows, votes, the code, and the first share time stay. Sharing again resumes copies from that moment, without cards from the gap. Deleting the bot name does the same pause. The next push with that name comes back unshared until the owner shares it again. The code does not change.
+
+Following a shared bot copies each later card into the follower's feed. Earlier cards are not copied. Unfollowing keeps the cards already copied. Following again starts from the new follow. A person cannot follow or vote on their own bot. Like and dislike are one vote. While a bot is not shared, votes cannot be added, changed, or cleared.
+
+Each board shows 50 currently shared bots. Bots you follow are grouped by owner on the Bots page. Search matches a bot name or an owner's username. A full code also finds a bot that is offline. The app does not publish a web link.
+
+`POST /v1/community/share` body `{name}`. `DELETE /v1/community/share?name=`. `POST /v1/community/follow` body `{owner_id, name}`. `DELETE /v1/community/follow?owner_id=&name=`. `POST /v1/community/vote` body `{owner_id, name, vote}` where vote is `1`, `-1`, or `0`. `GET /v1/community/board?kind=likes|follows`. `GET /v1/community/search?q=`. `GET /v1/community/bot?owner_id=&name=`. `GET /v1/community/following`. `GET /v1/community/copies?owner_id=&name=`.
 
 ### MCP
 

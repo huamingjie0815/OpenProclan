@@ -746,6 +746,18 @@ abstract class AppLocalizations {
   /// **'名称来自提交卡片时填写的 bot。删掉后，下次用同一名称推送会再出现。'**
   String get botsNote;
 
+  /// No description provided for @botsMine.
+  ///
+  /// In zh, this message translates to:
+  /// **'我的'**
+  String get botsMine;
+
+  /// No description provided for @botsTreeNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'从社区关注的 Bot 会按作者分组显示在这里，点开可以查看收到的卡片。'**
+  String get botsTreeNote;
+
   /// No description provided for @botProfile.
   ///
   /// In zh, this message translates to:
@@ -797,7 +809,7 @@ abstract class AppLocalizations {
   /// No description provided for @botDeleteBody.
   ///
   /// In zh, this message translates to:
-  /// **'只从列表去掉这个名字。已经收到的卡片还在。下次用同一名称推送时，会再出现在这里。'**
+  /// **'只从列表去掉这个名字。已经收到的卡片还在。分享到社区会停下来，短码还留着。下次用同一名称推送时，会再出现在这里。'**
   String get botDeleteBody;
 
   /// No description provided for @botMissing.
@@ -893,8 +905,272 @@ abstract class AppLocalizations {
   /// No description provided for @privacyText.
   ///
   /// In zh, this message translates to:
-  /// **'你的卡片和已读状态都保存在自己的服务与这台设备上。'**
+  /// **'你的卡片和已读状态都保存在自己的服务与这台设备上。分享到这台服务器社区的 bot，其他账号可以阅读它最新一张还在的卡片。撤下之后，知道短码的账号仍可以阅读这张最新卡片。'**
   String get privacyText;
+
+  /// No description provided for @community.
+  ///
+  /// In zh, this message translates to:
+  /// **'社区'**
+  String get community;
+
+  /// No description provided for @communityLikes.
+  ///
+  /// In zh, this message translates to:
+  /// **'点赞榜'**
+  String get communityLikes;
+
+  /// No description provided for @communityFollows.
+  ///
+  /// In zh, this message translates to:
+  /// **'关注榜'**
+  String get communityFollows;
+
+  /// No description provided for @communityFollowing.
+  ///
+  /// In zh, this message translates to:
+  /// **'我的关注'**
+  String get communityFollowing;
+
+  /// No description provided for @communitySearchLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索社区'**
+  String get communitySearchLabel;
+
+  /// No description provided for @communitySearchHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索 Bot、作者或短码'**
+  String get communitySearchHint;
+
+  /// No description provided for @communityClear.
+  ///
+  /// In zh, this message translates to:
+  /// **'清除搜索'**
+  String get communityClear;
+
+  /// No description provided for @communityResults.
+  ///
+  /// In zh, this message translates to:
+  /// **'“{q}” · {count} 个结果'**
+  String communityResults(String q, int count);
+
+  /// No description provided for @communitySortLikes.
+  ///
+  /// In zh, this message translates to:
+  /// **'按点赞数排序'**
+  String get communitySortLikes;
+
+  /// No description provided for @communitySortFollows.
+  ///
+  /// In zh, this message translates to:
+  /// **'按关注数排序'**
+  String get communitySortFollows;
+
+  /// No description provided for @communityEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有 Bot 分享到这个服务端的社区。'**
+  String get communityEmpty;
+
+  /// No description provided for @communityEmptySearch.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有找到“{q}”相关的 Bot，换个名称或短码试试。'**
+  String communityEmptySearch(String q);
+
+  /// No description provided for @communityOffline.
+  ///
+  /// In zh, this message translates to:
+  /// **'已下线'**
+  String get communityOffline;
+
+  /// No description provided for @communityFollow.
+  ///
+  /// In zh, this message translates to:
+  /// **'关注'**
+  String get communityFollow;
+
+  /// No description provided for @communityFollowingLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'已关注'**
+  String get communityFollowingLabel;
+
+  /// No description provided for @communityUnfollowTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消关注？'**
+  String get communityUnfollowTitle;
+
+  /// No description provided for @communityUnfollowBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'之后不再收到这个 Bot 的新卡片。已经收到的卡片还留在信息流里。'**
+  String get communityUnfollowBody;
+
+  /// No description provided for @communityUnfollow.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消关注'**
+  String get communityUnfollow;
+
+  /// No description provided for @communityLike.
+  ///
+  /// In zh, this message translates to:
+  /// **'点赞'**
+  String get communityLike;
+
+  /// No description provided for @communityDislike.
+  ///
+  /// In zh, this message translates to:
+  /// **'差评'**
+  String get communityDislike;
+
+  /// No description provided for @communityFollowerCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'关注'**
+  String get communityFollowerCount;
+
+  /// No description provided for @communityCode.
+  ///
+  /// In zh, this message translates to:
+  /// **'短码'**
+  String get communityCode;
+
+  /// No description provided for @communityCopy.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制'**
+  String get communityCopy;
+
+  /// No description provided for @communityCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'短码已复制'**
+  String get communityCopied;
+
+  /// No description provided for @communityLatest.
+  ///
+  /// In zh, this message translates to:
+  /// **'最近卡片'**
+  String get communityLatest;
+
+  /// No description provided for @communityAllCards.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部卡片'**
+  String get communityAllCards;
+
+  /// No description provided for @communityOpenBot.
+  ///
+  /// In zh, this message translates to:
+  /// **'Bot 资料'**
+  String get communityOpenBot;
+
+  /// No description provided for @communityMine.
+  ///
+  /// In zh, this message translates to:
+  /// **'我的 Bot'**
+  String get communityMine;
+
+  /// No description provided for @communityShare.
+  ///
+  /// In zh, this message translates to:
+  /// **'社区分享'**
+  String get communityShare;
+
+  /// No description provided for @communityShareNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'分享后，这个 Bot 会出现在社区榜单，其他人可以关注并收到新卡片。'**
+  String get communityShareNote;
+
+  /// No description provided for @communityShared.
+  ///
+  /// In zh, this message translates to:
+  /// **'已分享到社区'**
+  String get communityShared;
+
+  /// No description provided for @communityNotShared.
+  ///
+  /// In zh, this message translates to:
+  /// **'未分享'**
+  String get communityNotShared;
+
+  /// No description provided for @communityShareStopTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止分享？'**
+  String get communityShareStopTitle;
+
+  /// No description provided for @communityShareStopBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个 Bot 会从榜单消失，关注它的人不再收到新卡片。短码还在。'**
+  String get communityShareStopBody;
+
+  /// No description provided for @communityShareStop.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止分享'**
+  String get communityShareStop;
+
+  /// No description provided for @communitySharedDone.
+  ///
+  /// In zh, this message translates to:
+  /// **'已分享到社区'**
+  String get communitySharedDone;
+
+  /// No description provided for @communityUnsharedDone.
+  ///
+  /// In zh, this message translates to:
+  /// **'已停止分享'**
+  String get communityUnsharedDone;
+
+  /// No description provided for @communityFollowed.
+  ///
+  /// In zh, this message translates to:
+  /// **'已关注'**
+  String get communityFollowed;
+
+  /// No description provided for @communityUnfollowed.
+  ///
+  /// In zh, this message translates to:
+  /// **'已取消关注'**
+  String get communityUnfollowed;
+
+  /// No description provided for @communityBoardNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'榜单只统计分享到这个服务端的 Bot。'**
+  String get communityBoardNote;
+
+  /// No description provided for @communityBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回'**
+  String get communityBack;
+
+  /// No description provided for @communityGuestEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'服务端没有这个 Bot 还留着的卡片。'**
+  String get communityGuestEmpty;
+
+  /// No description provided for @communityOpen.
+  ///
+  /// In zh, this message translates to:
+  /// **'社区页'**
+  String get communityOpen;
+
+  /// No description provided for @communityCopiesEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有收到这个 Bot 的卡片。'**
+  String get communityCopiesEmpty;
 
   /// No description provided for @logout.
   ///

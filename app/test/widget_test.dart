@@ -811,6 +811,8 @@ void main() {
     expect(find.text('汇率波动'), findsOneWidget);
     expect(find.text('编辑资料'), findsNothing);
 
+    await tester.ensureVisible(find.byKey(const Key('bot-card-c2')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bot-card-c2')));
     await tester.pumpAndSettle();
     expect(find.text('另一篇'), findsOneWidget);

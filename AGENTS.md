@@ -16,15 +16,15 @@ From the repository root:
 | --- | --- |
 | `./scripts/serve` | Start the local inbox |
 | `./scripts/mcp-stdio` | Forward `submit_cards` to the local HTTP MCP. Start the server first |
-| `./scripts/run` | Start the app. Default device is macOS. Pass another device name after the command |
-| `./scripts/apk` | Build a release APK |
+| `./scripts/run` | Start the app. Default device is macOS. `./scripts/run dev` uses the development origin. `./scripts/run production` uses the production origin. Pass a device name after that |
+| `./scripts/apk` | Build a release APK. `./scripts/apk dev` and `./scripts/apk production` select the origin. With no argument, read `app/.env` |
 
 ```bash
 cd server && uv run pytest
 cd app && flutter test
 ```
 
-`API_BASE` lives only in `app/.env`. Do not put a session or a bot token in the compile flags. `server/.env` holds the server variables. Commit neither file. Do not write those values into source, docs, or replies.
+`API_BASE` lives in an env file, not in source. `app/.env`, `app/.env.development`, and `app/.env.production` are local and are not committed. Do not put a session or a bot token in the compile flags. `server/.env` holds the server variables. Do not commit any of these env files. Do not write tokens into source, docs, or replies.
 
 ## Accounts
 
