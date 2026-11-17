@@ -9,10 +9,16 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$root/app"
 envfile=.env
-if [ "${1:-}" = "dev" ] || [ "${1:-}" = "production" ]; then
-  envfile=".env.$1"
-  shift
-fi
+case "${1:-}" in
+  dev)
+    envfile=.env.development
+    shift
+    ;;
+  production)
+    envfile=.env.production
+    shift
+    ;;
+esac
 device=${1:-macos}
 if [ ! -f "$envfile" ]; then
   echo "missing app/$envfile. Copy app/.env.example and set API_BASE." >&2

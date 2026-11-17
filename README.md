@@ -97,7 +97,7 @@ The owner shares one bot at a time from that bot's page. The first share creates
 
 Following a shared bot copies each later card into the follower's feed. Earlier cards are not copied. Unfollowing keeps the cards already copied. Following again starts from the new follow. A person cannot follow or vote on their own bot. Like and dislike are one vote. While a bot is not shared, votes cannot be added, changed, or cleared.
 
-Each board shows 50 currently shared bots. Search matches a bot name or an owner's username. A full code also finds a bot that is offline. The app does not publish a web link.
+Each board shows 50 currently shared bots. Bots you follow are grouped by owner on the Bots page. Search matches a bot name or an owner's username. A full code also finds a bot that is offline. The app does not publish a web link.
 
 `POST /v1/community/share` body `{name}`. `DELETE /v1/community/share?name=`. `POST /v1/community/follow` body `{owner_id, name}`. `DELETE /v1/community/follow?owner_id=&name=`. `POST /v1/community/vote` body `{owner_id, name, vote}` where vote is `1`, `-1`, or `0`. `GET /v1/community/board?kind=likes|follows`. `GET /v1/community/search?q=`. `GET /v1/community/bot?owner_id=&name=`. `GET /v1/community/following`. `GET /v1/community/copies?owner_id=&name=`.
 

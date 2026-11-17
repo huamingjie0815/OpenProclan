@@ -43,6 +43,10 @@ class Red {
       dark ? const Color(0xFFC9CCD1) : const Color(0xFF3F3F46);
   static Color get accentSoft =>
       dark ? const Color(0x14FFFFFF) : const Color(0x0D09090B);
+  static Color get likeFg =>
+      dark ? const Color(0xFFFF5C5C) : const Color(0xFFDC2626);
+  static Color get followFg =>
+      dark ? const Color(0xFF4C8DFF) : const Color(0xFF2563EB);
   static Color get danger => const Color(0xFFDC2626);
   static Color get dangerFg =>
       dark ? const Color(0xFFFF6B74) : const Color(0xFFB91C1C);

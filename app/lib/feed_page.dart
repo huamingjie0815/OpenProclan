@@ -453,6 +453,7 @@ class _FeedPageState extends State<FeedPage> {
           open: open,
           account: widget.account,
           feed: widget.client,
+          community: widget.community,
           onCardOpened: (card) => _markRead(card.id),
           onCardResult: _applyDetailResult,
           onLogout: widget.onLogout,
@@ -1324,29 +1325,6 @@ class _FeedDrawer extends StatelessWidget {
                           ),
                         ),
                         TextButton(
-                          key: const Key('drawer-bots'),
-                          onPressed: onBots,
-                          style: TextButton.styleFrom(
-                            foregroundColor: Red.fg2,
-                            alignment: Alignment.centerLeft,
-                            minimumSize: const Size.fromHeight(48),
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.smart_toy_outlined, size: 18),
-                              const SizedBox(width: 12),
-                              Text(
-                                l.bots,
-                                style: Red.text(size: 14, height: 1.4),
-                              ),
-                            ],
-                          ),
-                        ),
-                        TextButton(
                           key: const Key('drawer-community'),
                           onPressed: onCommunity,
                           style: TextButton.styleFrom(
@@ -1364,6 +1342,29 @@ class _FeedDrawer extends StatelessWidget {
                               const SizedBox(width: 12),
                               Text(
                                 l.community,
+                                style: Red.text(size: 14, height: 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('drawer-bots'),
+                          onPressed: onBots,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Red.fg2,
+                            alignment: Alignment.centerLeft,
+                            minimumSize: const Size.fromHeight(48),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.smart_toy_outlined, size: 18),
+                              const SizedBox(width: 12),
+                              Text(
+                                l.bots,
                                 style: Red.text(size: 14, height: 1.4),
                               ),
                             ],

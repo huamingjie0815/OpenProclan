@@ -107,6 +107,7 @@ void main() {
     expect(find.text('关注'), findsWidgets);
     expect(find.text('已关注'), findsNothing);
 
+    await tester.ensureVisible(find.byKey(const Key('community-card-c1')));
     await tester.tap(find.byKey(const Key('community-card-c1')));
     await tester.pumpAndSettle();
     expect(find.text('正文'), findsOneWidget);
@@ -130,13 +131,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('community-row-u1-仍关注')));
     await tester.pumpAndSettle();
-    expect(find.text('已关注'), findsOneWidget);
+    expect(
+      tester.widget<IconButton>(find.byKey(const Key('community-follow'))).tooltip,
+      '取消关注',
+    );
     expect(_pressed(tester, 'community-follow'), isNotNull);
     expect(_pressed(tester, 'community-like'), isNull);
     expect(_pressed(tester, 'community-dislike'), isNull);
   });
 
-  testWidgets('following keeps groups while searching and copies stay deletable', (
+  testWidgets('followed bots stay grouped on the bots page and copies stay deletable', (
     tester,
   ) async {
     final community = _Community(
@@ -159,22 +163,34 @@ void main() {
         cards: [_card()],
       ),
     );
-    await _pump(tester, community, feed: FakeFeedClient(const []));
-    await tester.tap(find.byKey(const Key('community-following')));
+    await tester.pumpWidget(
+      ProclanApp(
+        locale: const Locale('zh'),
+        client: FakeFeedClient(const []),
+        pollEvery: null,
+        community: community,
+        account: AccountClient(
+          baseUrl: 'http://127.0.0.1:9',
+          httpClient: _QuietAccount(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('open-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawer-bots')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('community-user-u2')), findsOneWidget);
     expect(find.text('已下线'), findsOneWidget);
     expect(find.byKey(const Key('followed-u2-晚报')), findsOneWidget);
-
-    await tester.enterText(find.byKey(const Key('community-search')), '晚报');
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('community-search')), findsNothing);
     expect(community.searched, isNull);
-    expect(find.byKey(const Key('followed-u2-日报')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('followed-u2-日报')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('community-offline')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('community-card-c1')));
     await tester.tap(find.byKey(const Key('community-card-c1')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('删除卡片'));
@@ -204,7 +220,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('ABCD2345'), findsOneWidget);
-    expect(find.text('点赞 3 · 差评 1 · 关注 2'), findsOneWidget);
+    expect(find.text('短码 ABCD2345 · 3 点赞 · 2 关注'), findsOneWidget);
     expect(tester.widget<Switch>(find.byKey(const Key('share-community'))).value, isFalse);
 
     await tester.ensureVisible(find.byKey(const Key('share-community')));
@@ -263,14 +279,7 @@ Future<void> _pump(
 }
 
 VoidCallback? _pressed(WidgetTester tester, String key) {
-  return tester
-      .widget<OutlinedButton>(
-        find.descendant(
-          of: find.byKey(Key(key)),
-          matching: find.byType(OutlinedButton),
-        ),
-      )
-      .onPressed;
+  return tester.widget<IconButton>(find.byKey(Key(key))).onPressed;
 }
 
 CommunityBot _bot({
@@ -383,6 +392,31 @@ class _Community implements CommunityClient {
     required String name,
     required int vote,
   }) async {}
+}
+
+class _QuietAccount extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final path = request.url.path;
+    if (request.method == 'GET' && path == '/v1/me') {
+      return _json('{"id":"u","username":"林间"}');
+    }
+    if (request.method == 'GET' && path == '/v1/me/bot-token') {
+      return _json('{"token":"bot-secret"}');
+    }
+    if (request.method == 'GET' && path == '/v1/bots') {
+      return _json('{"bots":[]}');
+    }
+    return http.StreamedResponse(const Stream.empty(), 404);
+  }
+
+  http.StreamedResponse _json(String body) {
+    return http.StreamedResponse(
+      Stream.value(utf8.encode(body)),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  }
 }
 
 class _ShareAccount extends http.BaseClient {

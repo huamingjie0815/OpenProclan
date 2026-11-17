@@ -97,7 +97,7 @@ cd /opt/proclan/server && uv run python -m proclan_server.set_password <username
 
 关注一个正在分享的 bot 之后，它后来的每张卡片都会复制进关注者的信息流。更早的不复制。取消关注后，已经复制的留下。再次关注从新的这次算起。不能关注或投票给自己的 bot。点赞和差评是一张票。bot 不在分享中时，不能新增、改动或取消投票。
 
-每个榜显示 50 个正在分享的 bot。搜索匹配 bot 名或主人用户名。完整短码也能找到已下线的 bot。应用不提供网页链接。
+每个榜显示 50 个正在分享的 bot。关注的 bot 在 Bot 页按主人分组。搜索匹配 bot 名或主人用户名。完整短码也能找到已下线的 bot。应用不提供网页链接。
 
 `POST /v1/community/share` 正文 `{name}`。`DELETE /v1/community/share?name=`。`POST /v1/community/follow` 正文 `{owner_id, name}`。`DELETE /v1/community/follow?owner_id=&name=`。`POST /v1/community/vote` 正文 `{owner_id, name, vote}`，vote 是 `1`、`-1` 或 `0`。`GET /v1/community/board?kind=likes|follows`。`GET /v1/community/search?q=`。`GET /v1/community/bot?owner_id=&name=`。`GET /v1/community/following`。`GET /v1/community/copies?owner_id=&name=`。
 
