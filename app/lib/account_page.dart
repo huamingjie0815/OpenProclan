@@ -584,7 +584,7 @@ class _AccountPageState extends State<AccountPage> {
                         onDelete: _deleteBot,
                         onOpen: _openCard,
                       ),
-                    if (_screen == _AccountScreen.privacy) const _PrivacyBody(),
+                    if (_screen == _AccountScreen.privacy) _PrivacyBody(),
                   ],
                 ),
               ),

@@ -546,7 +546,7 @@ class _FeedPageState extends State<FeedPage> {
 
   Widget _body(AppLocalizations l, double pad) {
     if (_loading && _cards.isEmpty && _error == null) {
-      return const _Skeleton();
+      return _Skeleton();
     }
     if (_error != null && _cards.isEmpty) {
       return ListView(
@@ -1115,7 +1115,7 @@ class _Masthead extends StatelessWidget {
                     tooltip: l.openMenu,
                     onPressed: onMenu,
                     style: IconButton.styleFrom(
-                      foregroundColor: Red.fg2,
+                      foregroundColor: Red.fg,
                       fixedSize: const Size(44, 44),
                       padding: EdgeInsets.zero,
                     ),
@@ -1155,9 +1155,11 @@ class _SidebarIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // IconTheme notifies this const icon after a theme change.
+    final color = IconTheme.of(context).color ?? Red.fg;
     return CustomPaint(
       size: const Size(22, 22),
-      painter: _SidebarIconPainter(Red.fg2),
+      painter: _SidebarIconPainter(color),
     );
   }
 }
@@ -1173,7 +1175,7 @@ class _SidebarIconPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6 * scale
+      ..strokeWidth = 2 * scale
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     canvas.drawRRect(
