@@ -1,17 +1,5 @@
 import 'l10n/app_localizations.dart';
 
-String categoryLabel(AppLocalizations l, String wire) {
-  return switch (wire) {
-    '科技' => l.catTech,
-    '财经' => l.catMarkets,
-    '国际' => l.catWorld,
-    '社会' => l.catSociety,
-    '生活' => l.catLife,
-    '其他' => l.catOther,
-    _ => wire,
-  };
-}
-
 String weekdayName(AppLocalizations l, int weekday) {
   return switch (weekday) {
     1 => l.weekdayMon,
@@ -73,9 +61,9 @@ String dayHeading(AppLocalizations l, DateTime day) {
 String editionMeta(AppLocalizations l, DateTime now) {
   final week = weekdayName(l, now.weekday);
   if (_zh(l)) {
-    return '${now.month}月 · $week';
+    return '${now.month}月${now.day}日 · $week';
   }
-  return '${_monthsEn[now.month - 1]} · $week';
+  return '$week, ${_monthsEn[now.month - 1]} ${now.day}';
 }
 
 String shortWhen(AppLocalizations l, String iso) {

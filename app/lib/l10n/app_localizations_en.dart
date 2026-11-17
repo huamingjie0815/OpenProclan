@@ -167,6 +167,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get openMenu => 'Open menu';
+
+  @override
+  String get closeMenu => 'Close menu';
+
+  @override
+  String get drawerCaption => 'Your personal space';
+
+  @override
   String get settings => 'Settings';
 
   @override

@@ -273,24 +273,8 @@ class _DetailPageState extends State<DetailPage> {
                                 ),
                               ),
                               Expanded(
-                                child: Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: categoryLabel(l, card.category),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      if (time.isNotEmpty) ...[
-                                        TextSpan(
-                                          text: ' · ',
-                                          style: TextStyle(color: Red.meta),
-                                        ),
-                                        TextSpan(text: time),
-                                      ],
-                                    ],
-                                  ),
+                                child: Text(
+                                  time,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,

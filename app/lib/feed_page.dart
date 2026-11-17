@@ -52,20 +52,16 @@ class _FeedPageState extends State<FeedPage> {
   static const _unreadKey = 'proclan.unreadOnly';
   static const _collapsedKey = 'proclan.collapsed.v2';
 
-  final _tabs = ScrollController();
   final _feedScroll = ScrollController();
   var _showTop = false;
-  final _tabKeys = <String, GlobalKey>{};
+  var _drawerOpen = false;
 
-  List<String> _categories = const [];
   List<FeedCard> _cards = const [];
   Set<String> _read = {};
   Map<String, bool> _collapsed = {};
-  String? _category;
   var _unreadOnly = false;
   var _loading = true;
   Inbox? _inbox;
-  var _syncing = false;
   String? _error;
   Timer? _poll;
   var _loadEpoch = 0;
@@ -87,7 +83,6 @@ class _FeedPageState extends State<FeedPage> {
     _poll?.cancel();
     _feedScroll.removeListener(_onFeedScroll);
     _feedScroll.dispose();
-    _tabs.dispose();
     super.dispose();
   }
 
@@ -172,7 +167,6 @@ class _FeedPageState extends State<FeedPage> {
       });
     }
     try {
-      final categories = await widget.client.categories();
       final cards = await widget.client.feed();
       if (!mounted || epoch != _loadEpoch) {
         return null;
@@ -182,7 +176,6 @@ class _FeedPageState extends State<FeedPage> {
         inbox.merge(cards);
       }
       setState(() {
-        _categories = categories;
         if (inbox != null) {
           _cards = inbox.cards;
           _read = inbox.read;
@@ -205,23 +198,6 @@ class _FeedPageState extends State<FeedPage> {
       });
       return false;
     }
-  }
-
-  Future<void> _sync() async {
-    if (_syncing) {
-      return;
-    }
-    setState(() => _syncing = true);
-    final ok = await _load(silent: true);
-    if (!mounted) {
-      return;
-    }
-    setState(() => _syncing = false);
-    if (ok == null) {
-      return;
-    }
-    final l = AppLocalizations.of(context);
-    showRedNotice(context, ok ? l.refreshDone : l.offline);
   }
 
   void _rememberRead() {
@@ -430,43 +406,13 @@ class _FeedPageState extends State<FeedPage> {
     showRedNotice(context, l.markedUnread);
   }
 
-  void _select(String? category) {
-    setState(() => _category = category);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _centerTab(category));
-  }
-
-  void _centerTab(String? category) {
-    final target = _tabKeys[category ?? '']?.currentContext;
-    if (target == null) {
-      return;
-    }
-    Scrollable.ensureVisible(
-      target,
-      alignment: 0.5,
-      duration: const Duration(milliseconds: 200),
-      curve: Red.ease,
-    );
-  }
-
   void _reveal() {
-    if (_emptyKind == _EmptyKind.unread) {
-      _setUnread(false);
-      return;
-    }
-    setState(() => _category = null);
+    _setUnread(false);
   }
 
   List<FeedCard> get _visible {
-    return _cards.where((card) {
-      final inCategory = _category == null || card.category == _category;
-      final unreadOk = !_unreadOnly || !_read.contains(card.id);
-      return inCategory && unreadOk;
-    }).toList();
-  }
-
-  List<FeedCard> get _inCategory {
     return _cards
-        .where((card) => _category == null || card.category == _category)
+        .where((card) => !_unreadOnly || !_read.contains(card.id))
         .toList();
   }
 
@@ -474,13 +420,7 @@ class _FeedPageState extends State<FeedPage> {
     if (_cards.isEmpty) {
       return _EmptyKind.none;
     }
-    if (_inCategory.isEmpty) {
-      return _EmptyKind.category;
-    }
-    if (_unreadOnly && _inCategory.every((card) => _read.contains(card.id))) {
-      return _EmptyKind.unread;
-    }
-    return _EmptyKind.category;
+    return _EmptyKind.unread;
   }
 
   List<_DayGroup> _groups(List<FeedCard> visible) {
@@ -500,21 +440,13 @@ class _FeedPageState extends State<FeedPage> {
     return groups;
   }
 
-  GlobalKey _tabKey(String id) => _tabKeys.putIfAbsent(id, GlobalKey.new);
-
-  void _openSettings() {
+  void _openAccount(AccountOpen open) {
+    setState(() => _drawerOpen = false);
     Navigator.push<void>(
       context,
       PageRouteBuilder<void>(
         pageBuilder: (_, _, _) => AccountPage(
-          unreadOnly: _unreadOnly,
-          onUnreadOnly: _setUnread,
-          unreadCount: _cards.where((card) => !_read.contains(card.id)).length,
-          onLocale: _setLocale,
-          onTheme: widget.onTheme,
-          cacheMode: _inbox?.cacheMode ?? '7d',
-          onCacheMode: _setCacheMode,
-          syncSeconds: widget.pollEvery?.inSeconds,
+          open: open,
           account: widget.account,
           feed: widget.client,
           onCardOpened: (card) => _markRead(card.id),
@@ -538,6 +470,24 @@ class _FeedPageState extends State<FeedPage> {
     });
   }
 
+  void _openSettings() {
+    setState(() => _drawerOpen = false);
+    showSettingsCard(
+      context,
+      unreadOnly: _unreadOnly,
+      onUnreadOnly: _setUnread,
+      cacheMode: _inbox?.cacheMode ?? '7d',
+      onCacheMode: _setCacheMode,
+      onLocale: _setLocale,
+      onTheme: widget.onTheme,
+      syncSeconds: widget.pollEvery?.inSeconds,
+      account: widget.account,
+      onLogout: widget.onLogout,
+      onSecurity: () => _openAccount(AccountOpen.security),
+      onPrivacy: () => _openAccount(AccountOpen.privacy),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
@@ -557,18 +507,23 @@ class _FeedPageState extends State<FeedPage> {
                 pad: pad,
                 unread: unread,
                 unreadOnly: _unreadOnly,
-                day: now.day.toString().padLeft(2, '0'),
                 meta: editionMeta(l, now),
-                count: _cards.length,
-                syncing: _syncing,
-                mark: _avatarMark,
                 onUnread: unread == 0 ? null : () => _setUnread(true),
-                onSettings: _openSettings,
-                onSync: _sync,
+                onMenu: () => setState(() => _drawerOpen = true),
               ),
               Expanded(child: RedCenter(child: _body(l, pad))),
             ],
           ),
+          if (_drawerOpen)
+            Positioned.fill(
+              child: _FeedDrawer(
+                name: _username?.trim() ?? '',
+                mark: _avatarMark,
+                onClose: () => setState(() => _drawerOpen = false),
+                onBots: () => _openAccount(AccountOpen.bots),
+                onSettings: _openSettings,
+              ),
+            ),
           if (_showTop)
             Positioned(
               right: 24,
@@ -613,28 +568,6 @@ class _FeedPageState extends State<FeedPage> {
       controller: _feedScroll,
       padding: const EdgeInsets.only(bottom: 28),
       children: [
-        if (MediaQuery.sizeOf(context).width > 470)
-          Padding(
-            padding: EdgeInsets.fromLTRB(pad, 18, pad, 0),
-            child: Text(
-              l.mastheadNote.toUpperCase(),
-              style: Red.text(
-                size: 10.5,
-                height: 1.6,
-                weight: FontWeight.w500,
-                letterSpacing: 1.05,
-                color: Red.muted,
-              ),
-            ),
-          ),
-        _TabBar(
-          pad: pad,
-          controller: _tabs,
-          categories: _categories,
-          selected: _category,
-          tabKey: _tabKey,
-          onSelect: _select,
-        ),
         if (showFilter)
           Padding(
             padding: EdgeInsets.fromLTRB(pad, 0, pad, 0),
@@ -685,17 +618,15 @@ class _FeedPageState extends State<FeedPage> {
   String _emptyTitle(AppLocalizations l) => switch (_emptyKind) {
     _EmptyKind.none => l.emptyNoneTitle,
     _EmptyKind.unread => l.emptyUnreadTitle,
-    _EmptyKind.category => l.emptyCategoryTitle,
   };
 
   String _emptyBody(AppLocalizations l) => switch (_emptyKind) {
     _EmptyKind.none => l.emptyNoneBody,
     _EmptyKind.unread => l.emptyUnreadBody,
-    _EmptyKind.category => l.emptyCategoryBody,
   };
 }
 
-enum _EmptyKind { none, unread, category }
+enum _EmptyKind { none, unread }
 
 class _ToTop extends StatelessWidget {
   const _ToTop({required this.tooltip, required this.onPressed});
@@ -715,95 +646,6 @@ class _ToTop extends StatelessWidget {
         fixedSize: const Size(44, 44),
         side: BorderSide(color: Red.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-}
-
-class _TabBar extends StatelessWidget {
-  const _TabBar({
-    required this.pad,
-    required this.controller,
-    required this.categories,
-    required this.selected,
-    required this.tabKey,
-    required this.onSelect,
-  });
-
-  final double pad;
-  final ScrollController controller;
-  final List<String> categories;
-  final String? selected;
-  final GlobalKey Function(String id) tabKey;
-  final ValueChanged<String?> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return SizedBox(
-      height: 70,
-      child: ListView(
-        controller: controller,
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.fromLTRB(pad, 20, pad, 16),
-        children: [
-          _Tab(
-            key: tabKey(''),
-            label: l.all,
-            selected: selected == null,
-            onTap: () => onSelect(null),
-          ),
-          for (final category in categories)
-            _Tab(
-              key: tabKey(category),
-              label: categoryLabel(l, category),
-              selected: selected == category,
-              onTap: () => onSelect(category),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Tab extends StatelessWidget {
-  const _Tab({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = selected ? Red.accent : Colors.transparent;
-    final fg = selected ? Red.accentOn : Red.muted;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: TextButton(
-        onPressed: onTap,
-        style: TextButton.styleFrom(
-          backgroundColor: bg,
-          foregroundColor: fg,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          minimumSize: const Size(0, 34),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-            side: BorderSide(color: selected ? Red.accent : Red.border),
-          ),
-          textStyle: Red.text(
-            size: 11,
-            height: 1,
-            weight: FontWeight.w500,
-            letterSpacing: 0.7,
-          ),
-        ),
-        child: Text(label.toUpperCase()),
       ),
     );
   }
@@ -1084,24 +926,6 @@ class _CardState extends State<_Card> {
                               ),
                               const SizedBox(width: 7),
                             ],
-                            Flexible(
-                              child: Text(
-                                categoryLabel(l, card.category).toUpperCase(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Red.text(
-                                  size: 10.5,
-                                  color: Red.fg2,
-                                  height: 1.3,
-                                  weight: FontWeight.w500,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              ' · ',
-                              style: Red.text(size: 10.5, color: Red.border),
-                            ),
                             Text(
                               widget.read ? l.read : l.minutesRead(minutes),
                               style: Red.text(
@@ -1258,34 +1082,21 @@ class _Masthead extends StatelessWidget {
     required this.pad,
     required this.unread,
     required this.unreadOnly,
-    required this.day,
     required this.meta,
-    required this.count,
-    required this.syncing,
-    required this.mark,
     required this.onUnread,
-    required this.onSettings,
-    required this.onSync,
+    required this.onMenu,
   });
 
   final double pad;
   final int unread;
   final bool unreadOnly;
-  final String day;
   final String meta;
-  final int count;
-  final bool syncing;
-  final String mark;
   final VoidCallback? onUnread;
-  final VoidCallback onSettings;
-  final VoidCallback onSync;
+  final VoidCallback onMenu;
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final narrow = MediaQuery.sizeOf(context).width <= 470;
-    final daySize = narrow ? 42.0 : 52.0;
-    final edition = count == 1 ? l.groupCountOne : l.groupCount(count);
     return ColoredBox(
       color: Red.bg,
       child: DecoratedBox(
@@ -1296,86 +1107,36 @@ class _Masthead extends StatelessWidget {
           bottom: false,
           child: RedCenter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                pad,
-                narrow ? 18 : 20,
-                pad,
-                narrow ? 14 : 16,
-              ),
+              padding: EdgeInsets.fromLTRB(pad, 10, pad, 10),
               child: Row(
                 children: [
-                  Text(
-                    day,
-                    style: Red.text(
-                      size: daySize,
-                      height: 0.88,
-                      letterSpacing: daySize * -0.055,
-                      weight: FontWeight.w400,
-                      tabular: true,
+                  IconButton(
+                    key: const Key('open-menu'),
+                    tooltip: l.openMenu,
+                    onPressed: onMenu,
+                    style: IconButton.styleFrom(
+                      foregroundColor: Red.fg2,
+                      fixedSize: const Size(44, 44),
+                      padding: EdgeInsets.zero,
                     ),
+                    icon: const _SidebarIcon(),
                   ),
-                  SizedBox(width: narrow ? 10 : 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          meta.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Red.text(
-                            size: narrow ? 11 : 12,
-                            height: 1.3,
-                            weight: FontWeight.w500,
-                            letterSpacing: 0.9,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          edition.toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Red.text(
-                            size: 10.5,
-                            height: 1.3,
-                            letterSpacing: 0.6,
-                            color: Red.muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!unreadOnly) ...[
-                    const SizedBox(width: 8),
+                  if (!unreadOnly)
                     _UnreadEntry(
                       label: unread > 0 ? l.unreadCount(unread) : l.allRead,
                       enabled: onUnread != null,
                       onPressed: onUnread,
                     ),
-                  ],
-                  const SizedBox(width: 6),
-                  _RefreshButton(syncing: syncing, onPressed: onSync),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    key: const Key('settings'),
-                    tooltip: l.settings,
-                    onPressed: onSettings,
-                    style: IconButton.styleFrom(
-                      backgroundColor: Red.surface,
-                      foregroundColor: Red.fg,
-                      side: BorderSide(color: Red.border),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      fixedSize: Size(narrow ? 36 : 38, narrow ? 36 : 38),
-                      padding: EdgeInsets.zero,
-                    ),
-                    icon: Text(
-                      mark,
+                  Expanded(
+                    child: Text(
+                      meta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
                       style: Red.text(
-                        size: 13,
-                        height: 1,
-                        weight: FontWeight.w500,
+                        size: 15,
+                        height: 1.2,
+                        color: Red.muted,
                       ),
                     ),
                   ),
@@ -1385,6 +1146,242 @@ class _Masthead extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SidebarIcon extends StatelessWidget {
+  const _SidebarIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(22, 22),
+      painter: _SidebarIconPainter(Red.fg2),
+    );
+  }
+}
+
+class _SidebarIconPainter extends CustomPainter {
+  const _SidebarIconPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6 * scale
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(3.5 * scale, 3.5 * scale, 17 * scale, 17 * scale),
+        Radius.circular(2.5 * scale),
+      ),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(9 * scale, 4 * scale),
+      Offset(9 * scale, 20 * scale),
+      paint,
+    );
+    for (final y in const [8.0, 12.0, 16.0]) {
+      canvas.drawLine(
+        Offset(12.5 * scale, y * scale),
+        Offset(16.5 * scale, y * scale),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SidebarIconPainter old) => old.color != color;
+}
+
+class _FeedDrawer extends StatelessWidget {
+  const _FeedDrawer({
+    required this.name,
+    required this.mark,
+    required this.onClose,
+    required this.onBots,
+    required this.onSettings,
+  });
+
+  final String name;
+  final String mark;
+  final VoidCallback onClose;
+  final VoidCallback onBots;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final width = MediaQuery.sizeOf(context).width;
+    final panel = width - 52 < 304 ? width - 52 : 304.0;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: onClose,
+            child: ColoredBox(
+              color: Red.scrim,
+              child: Semantics(label: l.closeMenu),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Material(
+            color: Red.bg,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(right: BorderSide(color: Red.border)),
+              ),
+              child: SizedBox(
+                width: panel,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 18),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(color: Red.border),
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 18),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Proclan',
+                                    style: Red.text(
+                                      size: 20,
+                                      height: 1.2,
+                                      weight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    l.drawerCaption,
+                                    style: Red.text(
+                                      size: 11,
+                                      height: 1.4,
+                                      color: Red.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('drawer-bots'),
+                          onPressed: onBots,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Red.fg2,
+                            alignment: Alignment.centerLeft,
+                            minimumSize: const Size.fromHeight(48),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.smart_toy_outlined, size: 18),
+                              const SizedBox(width: 12),
+                              Text(
+                                l.bots,
+                                style: Red.text(size: 14, height: 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              top: BorderSide(color: Red.border),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: Red.surfaceWarm,
+                                          borderRadius: BorderRadius.circular(
+                                            19,
+                                          ),
+                                          border: Border.all(color: Red.border),
+                                        ),
+                                        child: Text(
+                                          mark,
+                                          key: const Key('drawer-avatar'),
+                                          style: Red.text(
+                                            size: 14,
+                                            height: 1,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Red.text(
+                                            size: 12,
+                                            height: 1.4,
+                                            weight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  key: const Key('settings'),
+                                  tooltip: l.settings,
+                                  onPressed: onSettings,
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: Red.muted,
+                                    fixedSize: const Size(44, 44),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.settings_outlined,
+                                    size: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1441,68 +1438,6 @@ class _UnreadEntry extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _RefreshButton extends StatefulWidget {
-  const _RefreshButton({required this.syncing, required this.onPressed});
-
-  final bool syncing;
-  final VoidCallback onPressed;
-
-  @override
-  State<_RefreshButton> createState() => _RefreshButtonState();
-}
-
-class _RefreshButtonState extends State<_RefreshButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 700),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.syncing) {
-      _spin.repeat();
-    }
-  }
-
-  @override
-  void didUpdateWidget(_RefreshButton old) {
-    super.didUpdateWidget(old);
-    if (widget.syncing && !_spin.isAnimating) {
-      _spin.repeat();
-    } else if (!widget.syncing && _spin.isAnimating) {
-      _spin.stop();
-      _spin.value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _spin.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: AppLocalizations.of(context).syncNow,
-      onPressed: widget.syncing ? null : widget.onPressed,
-      style: IconButton.styleFrom(
-        foregroundColor: Red.fg2,
-        disabledForegroundColor: Red.fg2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        fixedSize: const Size(38, 38),
-        padding: EdgeInsets.zero,
-      ),
-      icon: RotationTransition(
-        turns: _spin,
-        child: const Icon(Icons.refresh, size: 19),
       ),
     );
   }

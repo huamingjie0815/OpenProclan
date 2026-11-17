@@ -165,6 +165,15 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get openMenu => '打开侧边栏';
+
+  @override
+  String get closeMenu => '关闭侧边栏';
+
+  @override
+  String get drawerCaption => '个人内容空间';
+
+  @override
   String get settings => '设置';
 
   @override
