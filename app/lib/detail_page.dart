@@ -7,6 +7,7 @@ import 'chrome.dart';
 import 'feed_client.dart';
 import 'l10n/app_localizations.dart';
 import 'red.dart';
+import 'share_image.dart';
 
 enum DetailResult { deleted, markedUnread }
 
@@ -93,6 +94,7 @@ class DetailPage extends StatefulWidget {
 
 class _DetailPageState extends State<DetailPage> {
   final _scroll = ScrollController();
+  final _shareKey = GlobalKey();
   var _progress = 0.0;
   var _deleting = false;
   int? _activeVideo;
@@ -218,19 +220,25 @@ class _DetailPageState extends State<DetailPage> {
   Future<void> _share(BuildContext anchor) async {
     final card = widget.card;
     final text = cardShareText(card);
-    if (text.isEmpty) {
-      return;
-    }
     final box = anchor.findRenderObject();
     final origin = box is RenderBox && box.hasSize
         ? box.localToGlobal(Offset.zero) & box.size
         : null;
     final title = card.title.trim();
+    // 卡片整张画成长图；截不到就退回只发文字。
+    final png = await captureBoundaryPng(_shareKey);
+    final file = png == null ? null : await writeShareImage(png, card.id);
+    if (text.isEmpty && file == null) {
+      return;
+    }
     try {
       await SharePlus.instance.share(
         ShareParams(
-          text: text,
+          text: text.isEmpty ? null : text,
           subject: title.isEmpty ? null : title,
+          files: file == null
+              ? null
+              : [XFile(file.path, mimeType: 'image/png')],
           sharePositionOrigin: origin,
         ),
       );
@@ -365,182 +373,185 @@ class _DetailPageState extends State<DetailPage> {
                   40 + bottom,
                 ),
                 children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Red.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Red.border),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final url in card.images)
-                            ArticleFigure(
-                              url: url,
-                              headers: widget.client.imageHeadersFor(url),
-                              maxHeight: imageHeight,
-                            ),
-                          Padding(
-                            padding: wide
-                                ? const EdgeInsets.fromLTRB(48, 40, 48, 46)
-                                : const EdgeInsets.fromLTRB(22, 26, 22, 30),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (
-                                  var i = 0;
-                                  i < card.videoUrls.length;
-                                  i++
-                                ) ...[
-                                  if (i > 0) const SizedBox(height: 12),
-                                  ArticleVideo(
-                                    url: card.videoUrls[i],
-                                    index: i,
-                                    active: _activeVideo == i,
-                                    onActivate: () {
-                                      setState(() => _activeVideo = i);
-                                    },
-                                    onOpen: _open,
-                                  ),
-                                ],
-                                SelectionArea(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      if (card.videoUrls.isNotEmpty)
-                                        const SizedBox(height: 20),
-                                      Text(
-                                        card.title,
-                                        style: Red.text(
-                                          size: wide ? 40 : 30,
-                                          height: wide ? 1.2 : 1.25,
-                                          letterSpacing: Red.em(
-                                            wide ? 40 : 30,
-                                            -0.028,
-                                          ),
-                                          weight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      if (card.summary.isNotEmpty) ...[
-                                        const SizedBox(height: 12),
+                  RepaintBoundary(
+                    key: _shareKey,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Red.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Red.border),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final url in card.images)
+                              ArticleFigure(
+                                url: url,
+                                headers: widget.client.imageHeadersFor(url),
+                                maxHeight: imageHeight,
+                              ),
+                            Padding(
+                              padding: wide
+                                  ? const EdgeInsets.fromLTRB(48, 40, 48, 46)
+                                  : const EdgeInsets.fromLTRB(22, 26, 22, 30),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (
+                                    var i = 0;
+                                    i < card.videoUrls.length;
+                                    i++
+                                  ) ...[
+                                    if (i > 0) const SizedBox(height: 12),
+                                    ArticleVideo(
+                                      url: card.videoUrls[i],
+                                      index: i,
+                                      active: _activeVideo == i,
+                                      onActivate: () {
+                                        setState(() => _activeVideo = i);
+                                      },
+                                      onOpen: _open,
+                                    ),
+                                  ],
+                                  SelectionArea(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        if (card.videoUrls.isNotEmpty)
+                                          const SizedBox(height: 20),
                                         Text(
-                                          card.summary,
+                                          card.title,
                                           style: Red.text(
-                                            size: wide ? 16 : 15,
-                                            color: Red.muted,
-                                            height: 1.7,
+                                            size: wide ? 40 : 30,
+                                            height: wide ? 1.2 : 1.25,
+                                            letterSpacing: Red.em(
+                                              wide ? 40 : 30,
+                                              -0.028,
+                                            ),
+                                            weight: FontWeight.w500,
                                           ),
                                         ),
-                                      ],
-                                      if (slots.isNotEmpty) ...[
-                                        const SizedBox(height: 20),
-                                        ColoredBox(
-                                          color: Red.border,
-                                          child: const SizedBox(height: 1),
-                                        ),
-                                        const SizedBox(height: 20),
-                                        ...slots,
-                                      ],
-                                      if (card.tags.isNotEmpty) ...[
-                                        const SizedBox(height: 20),
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 6,
-                                          children: [
-                                            for (final tag in card.tags)
-                                              DecoratedBox(
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                  border: Border.all(
-                                                    color: Red.border,
+                                        if (card.summary.isNotEmpty) ...[
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            card.summary,
+                                            style: Red.text(
+                                              size: wide ? 16 : 15,
+                                              color: Red.muted,
+                                              height: 1.7,
+                                            ),
+                                          ),
+                                        ],
+                                        if (slots.isNotEmpty) ...[
+                                          const SizedBox(height: 20),
+                                          ColoredBox(
+                                            color: Red.border,
+                                            child: const SizedBox(height: 1),
+                                          ),
+                                          const SizedBox(height: 20),
+                                          ...slots,
+                                        ],
+                                        if (card.tags.isNotEmpty) ...[
+                                          const SizedBox(height: 20),
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: [
+                                              for (final tag in card.tags)
+                                                DecoratedBox(
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(4),
+                                                    border: Border.all(
+                                                      color: Red.border,
+                                                    ),
                                                   ),
-                                                ),
-                                                child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 9,
-                                                        vertical: 6,
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 9,
+                                                          vertical: 6,
+                                                        ),
+                                                    child: Text(
+                                                      tag.toUpperCase(),
+                                                      style: Red.text(
+                                                        size: 10,
+                                                        color: Red.muted,
+                                                        height: 1.2,
+                                                        letterSpacing: 0.7,
                                                       ),
-                                                  child: Text(
-                                                    tag.toUpperCase(),
-                                                    style: Red.text(
-                                                      size: 10,
-                                                      color: Red.muted,
-                                                      height: 1.2,
-                                                      letterSpacing: 0.7,
                                                     ),
                                                   ),
                                                 ),
-                                              ),
-                                          ],
-                                        ),
-                                      ],
-                                      if (card.source.isNotEmpty ||
-                                          card.sourceUrls.isNotEmpty) ...[
-                                        const SizedBox(height: 20),
-                                        _SourceBox(card: card, onOpen: _open),
-                                      ],
-                                      if (card.createdBot.isNotEmpty) ...[
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          card.sourceUsername.isEmpty
-                                              ? card.createdBot.toUpperCase()
-                                              : '${card.createdBot.toUpperCase()} · ${card.sourceUsername}',
-                                          style: Red.text(
-                                            size: 10.5,
-                                            color: Red.meta,
-                                            height: 1.4,
-                                            letterSpacing: 0.5,
+                                            ],
                                           ),
-                                        ),
+                                        ],
+                                        if (card.source.isNotEmpty ||
+                                            card.sourceUrls.isNotEmpty) ...[
+                                          const SizedBox(height: 20),
+                                          _SourceBox(card: card, onOpen: _open),
+                                        ],
+                                        if (card.createdBot.isNotEmpty) ...[
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            card.sourceUsername.isEmpty
+                                                ? card.createdBot.toUpperCase()
+                                                : '${card.createdBot.toUpperCase()} · ${card.sourceUsername}',
+                                            style: Red.text(
+                                              size: 10.5,
+                                              color: Red.meta,
+                                              height: 1.4,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                        ],
                                       ],
-                                    ],
-                                  ),
-                                ),
-                                if (widget.manage) ...[
-                                  const SizedBox(height: 20),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: _GhostButton(
-                                      label: l.markUnread,
-                                      onPressed: _markUnread,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  OutlinedButton.icon(
-                                    onPressed: _deleting ? null : _delete,
-                                    icon: Icon(
-                                      Icons.delete_outline,
-                                      size: 15,
-                                      color: Red.dangerFg,
-                                    ),
-                                    label: Text(l.deleteCard.toUpperCase()),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: Red.dangerFg,
-                                      disabledForegroundColor: Red.muted,
-                                      side: BorderSide(color: Red.dangerLine),
-                                      minimumSize: const Size.fromHeight(46),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
+                                  if (widget.manage) ...[
+                                    const SizedBox(height: 20),
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: _GhostButton(
+                                        label: l.markUnread,
+                                        onPressed: _markUnread,
                                       ),
-                                      textStyle: Red.text(
-                                        size: 11,
-                                        height: 1,
-                                        weight: FontWeight.w500,
-                                        letterSpacing: 0.4,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    OutlinedButton.icon(
+                                      onPressed: _deleting ? null : _delete,
+                                      icon: Icon(
+                                        Icons.delete_outline,
+                                        size: 15,
                                         color: Red.dangerFg,
                                       ),
+                                      label: Text(l.deleteCard.toUpperCase()),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: Red.dangerFg,
+                                        disabledForegroundColor: Red.muted,
+                                        side: BorderSide(color: Red.dangerLine),
+                                        minimumSize: const Size.fromHeight(46),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        textStyle: Red.text(
+                                          size: 11,
+                                          height: 1,
+                                          weight: FontWeight.w500,
+                                          letterSpacing: 0.4,
+                                          color: Red.dangerFg,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
