@@ -87,7 +87,7 @@ These are the installed contracts:
 - Repository `huamingjie0815/OpenProclan`.
 - Launcher icon: a black field with a silver letter P.
 - `app/android/app/proguard-rules.pro`. Removing it makes release stop on the splash screen.
-- Release keeps the Android debug signing config. This is a sideload build, not a store package.
+- Release signs with the fixed release key in `app/android/key.properties`, written by CI from the `PROCLAN_KEYSTORE_BASE64`, `PROCLAN_KEYSTORE_PASSWORD`, `PROCLAN_KEY_ALIAS`, and `PROCLAN_KEY_PASSWORD` secrets. The keystore stays out of git. Do not go back to the debug signing config: a machine-local debug key differs per build, so no phone can update over an earlier build. This is a sideload build, not a store package.
 
 Keep the title, summary, body, and tags as submitted. The stored body and the feed body stay as submitted Markdown. UI copy may switch between Chinese and English. Empty states and delete say "card".
 

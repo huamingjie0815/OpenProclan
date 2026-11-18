@@ -12,4 +12,4 @@ Every push to `main` builds the production APK in GitHub Actions with `API_BASE=
 
 Sign in with the username and password created on the server.
 
-The APK is written to `app/build/app/outputs/flutter-apk/app-release.apk`. Release uses the Android debug certificate so the person can install it themselves. Do not change the signing config.
+The APK is written to `app/build/app/outputs/flutter-apk/app-release.apk`. Release signs with a fixed release key: put `storeFile`, `storePassword`, `keyAlias`, `keyPassword`, and `storeType` in `app/android/key.properties`, which stays out of git. Without that file a release build falls back to the debug certificate, and such a build cannot replace an installed one. GitHub Actions writes the file from the repository secrets `PROCLAN_KEYSTORE_BASE64`, `PROCLAN_KEYSTORE_PASSWORD`, `PROCLAN_KEY_ALIAS`, and `PROCLAN_KEY_PASSWORD`.
