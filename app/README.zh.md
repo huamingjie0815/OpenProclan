@@ -12,4 +12,4 @@ Proclan 的 Flutter 客户端。按天读自己的墙，打开文章（含图表
 
 用服务器上创建的用户名和密码登录。
 
-APK 在 `app/build/app/outputs/flutter-apk/app-release.apk`。release 使用 Android debug 证书，供自己安装。不要改签名配置。
+APK 在 `app/build/app/outputs/flutter-apk/app-release.apk`。release 用固定发布密钥签名：在 `app/android/key.properties` 写 `storeFile`、`storePassword`、`keyAlias`、`keyPassword`、`storeType`，这个文件不进 git。本机没有这份配置时会退回调试证书，那种包没法和别人的包互相覆盖安装。GitHub Actions 用仓库 Secrets 里的 `PROCLAN_KEYSTORE_BASE64`、`PROCLAN_KEYSTORE_PASSWORD`、`PROCLAN_KEY_ALIAS`、`PROCLAN_KEY_PASSWORD` 自动写这份配置。

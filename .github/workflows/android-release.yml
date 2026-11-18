@@ -59,6 +59,36 @@ jobs:
           printf 'API_BASE=%s\n' "$API_BASE" > app/.env.production
           echo "building against $API_BASE"
 
+      # 固定发布密钥。不写这份配置时 Gradle 会退回各机器自带的调试密钥，
+      # 每次构建签名都不同，手机上覆盖安装就会报签名异常。
+      - name: Write release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PROCLAN_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.PROCLAN_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PROCLAN_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.PROCLAN_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+              echo "::error::PROCLAN_KEYSTORE_BASE64 is missing; refusing to publish an APK that no phone can update over"
+              exit 1
+            fi
+            echo "::warning::No release keystore secret; this build uses the per-run debug key"
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/proclan-release.p12"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+          chmod 600 "$keystore"
+          umask 077
+          cat > app/android/key.properties <<EOF
+          storeFile=$keystore
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          storeType=PKCS12
+          EOF
+
       - name: Resolve dependencies
         working-directory: app
         run: flutter pub get
@@ -69,6 +99,18 @@ jobs:
 
       - name: Build release APK
         run: ./scripts/apk production
+
+      # 签名必须每次相同，否则手机上无法覆盖安装。这里把证书指纹打出来当证据。
+      - name: Verify signature
+        run: |
+          apk=app/build/app/outputs/flutter-apk/app-release.apk
+          signer=$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools" -name apksigner -type f | sort -V | tail -1)
+          "$signer" verify --print-certs "$apk" | tee certs.txt
+          fp=$(grep -m1 'SHA-256 digest' certs.txt | sed 's/.*: //')
+          echo "SIGNER_SHA256=$fp" >> "$GITHUB_ENV"
+          if grep -q 'CN=Android Debug' certs.txt; then
+            echo "::warning::Signed with a machine-local debug key; phones cannot update over an earlier build"
+          fi
 
       - name: Checksum and summary
         run: |
@@ -82,6 +124,7 @@ jobs:
             echo "| API_BASE | \`$API_BASE\` |"
             echo "| commit | \`$GITHUB_SHA\` |"
             echo "| 文件大小 | $(du -h "$apk" | cut -f1) |"
+            echo "| 签名证书 | \`$SIGNER_SHA256\` |"
             echo "| sha256 | \`$(cut -d' ' -f1 apk.sha256)\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -114,8 +157,10 @@ jobs:
             printf '| commit | `%s` |\n' "$GITHUB_SHA"
             printf '| 构建 | [run %s](%s/%s/actions/runs/%s) |\n' "$GITHUB_RUN_NUMBER" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             printf '| 文件大小 | %s |\n' "$size"
+            printf '| 签名证书 | `%s` |\n' "${SIGNER_SHA256:-unknown}"
             printf '| sha256 | `%s` |\n\n' "$sha"
-            printf '手机浏览器直接打开 app-release.apk 下载，安装时允许「安装未知来源应用」。\n'
+            printf '手机浏览器直接打开 app-release.apk 下载，安装时允许「安装未知来源应用」。\n\n'
+            printf '这个包用固定发布密钥签名，可以覆盖安装以后的新版本。如果手机上还是更早的调试签名版本，先卸载一次再装。\n'
           } > release-notes.md
           # 每次重建同一个 release，tag 指向最新提交，下载地址保持不变。
           gh release delete "$tag" --yes --cleanup-tag || true

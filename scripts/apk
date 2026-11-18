@@ -1,5 +1,5 @@
 #!/bin/sh
-# Release APK. Signing stays the Android debug key.
+# Release APK. Signs with app/android/key.properties when it exists, else debug.
 # Usage: ./scripts/apk [dev|production]
 # dev reads app/.env.development. production reads app/.env.production.
 # With no argument, reads app/.env.
