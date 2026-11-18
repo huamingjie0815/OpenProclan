@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-release-${{ github.ref }}
@@ -94,3 +94,34 @@ jobs:
             apk.sha256
           if-no-files-found: error
           retention-days: 30
+
+      # 只对 main 发布。下载地址固定不变，手机浏览器点开就能存，不用登录：
+      # https://github.com/huamingjie0815/OpenProclan/releases/latest/download/app-release.apk
+      - name: Publish to GitHub Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag=apk-latest
+          apk=app/build/app/outputs/flutter-apk/app-release.apk
+          sha=$(cut -d' ' -f1 apk.sha256)
+          size=$(du -h "$apk" | cut -f1)
+          {
+            printf 'main 分支自动构建的生产包，API_BASE=`%s`。\n\n' "$API_BASE"
+            printf '| 字段 | 值 |\n'
+            printf '| --- | --- |\n'
+            printf '| commit | `%s` |\n' "$GITHUB_SHA"
+            printf '| 构建 | [run %s](%s/%s/actions/runs/%s) |\n' "$GITHUB_RUN_NUMBER" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf '| 文件大小 | %s |\n' "$size"
+            printf '| sha256 | `%s` |\n\n' "$sha"
+            printf '手机浏览器直接打开 app-release.apk 下载，安装时允许「安装未知来源应用」。\n'
+          } > release-notes.md
+          # 每次重建同一个 release，tag 指向最新提交，下载地址保持不变。
+          gh release delete "$tag" --yes --cleanup-tag || true
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "Proclan APK（最新构建）" \
+            --latest \
+            --notes-file release-notes.md \
+            "$apk" apk.sha256
