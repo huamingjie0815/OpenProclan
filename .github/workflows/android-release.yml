@@ -1,9 +1,14 @@
 name: Android release
 
 # main 有新提交就出一个生产包；也可以在 Actions 页面手动触发。
+# 动到 App 或这个文件的 PR 先编一遍，免得合并后才发现编不过。
 on:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/android-release.yml"
   workflow_dispatch:
 
 permissions:
