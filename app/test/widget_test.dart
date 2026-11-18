@@ -973,6 +973,8 @@ void main() {
     expect(find.text('价格下调'), findsOneWidget);
     expect(find.textContaining('Hacker News'), findsWidgets);
 
+    await tester.ensureVisible(find.byKey(const Key('bot-card-c1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bot-card-c1')));
     await tester.pumpAndSettle();
     expect(_body('正文'), findsOneWidget);

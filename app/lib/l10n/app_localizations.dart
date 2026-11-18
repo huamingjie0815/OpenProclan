@@ -1076,6 +1076,156 @@ abstract class AppLocalizations {
   /// **'未分享'**
   String get communityNotShared;
 
+  /// No description provided for @communityDirected.
+  ///
+  /// In zh, this message translates to:
+  /// **'只对名单中的人可见'**
+  String get communityDirected;
+
+  /// No description provided for @communityDirectedPaused.
+  ///
+  /// In zh, this message translates to:
+  /// **'定向已暂停'**
+  String get communityDirectedPaused;
+
+  /// No description provided for @communityDirectedDormant.
+  ///
+  /// In zh, this message translates to:
+  /// **'公开期间不生效'**
+  String get communityDirectedDormant;
+
+  /// No description provided for @communityDirect.
+  ///
+  /// In zh, this message translates to:
+  /// **'定向分享'**
+  String get communityDirect;
+
+  /// No description provided for @communityDirectNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入用户名后打开开关。只有名单里的人能看到并关注，社区榜上看不到。'**
+  String get communityDirectNote;
+
+  /// No description provided for @communityDirectAdd.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入'**
+  String get communityDirectAdd;
+
+  /// No description provided for @communityDirectUsername.
+  ///
+  /// In zh, this message translates to:
+  /// **'用户名'**
+  String get communityDirectUsername;
+
+  /// No description provided for @communityDirectOn.
+  ///
+  /// In zh, this message translates to:
+  /// **'对这些人开放'**
+  String get communityDirectOn;
+
+  /// No description provided for @communityDirectStopTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂停定向？'**
+  String get communityDirectStopTitle;
+
+  /// No description provided for @communityDirectStopBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'这些人暂时看不到，也不再收到新卡片。名单还留着。'**
+  String get communityDirectStopBody;
+
+  /// No description provided for @communityDirectStop.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂停'**
+  String get communityDirectStop;
+
+  /// No description provided for @communityDirectPausedDone.
+  ///
+  /// In zh, this message translates to:
+  /// **'定向已暂停'**
+  String get communityDirectPausedDone;
+
+  /// No description provided for @communityDirectOnDone.
+  ///
+  /// In zh, this message translates to:
+  /// **'已只对名单中的人开放'**
+  String get communityDirectOnDone;
+
+  /// No description provided for @communityDirectAdded.
+  ///
+  /// In zh, this message translates to:
+  /// **'已加入名单'**
+  String get communityDirectAdded;
+
+  /// No description provided for @communityDirectRemoved.
+  ///
+  /// In zh, this message translates to:
+  /// **'已移出名单'**
+  String get communityDirectRemoved;
+
+  /// No description provided for @communityDirectRemoveTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'移出名单？'**
+  String get communityDirectRemoveTitle;
+
+  /// No description provided for @communityDirectRemoveBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'{name} 将不能再看到这个 Bot。已经收到的卡片还留着。'**
+  String communityDirectRemoveBody(String name);
+
+  /// No description provided for @communityDirectRemove.
+  ///
+  /// In zh, this message translates to:
+  /// **'移出'**
+  String get communityDirectRemove;
+
+  /// No description provided for @communityDirectedInbox.
+  ///
+  /// In zh, this message translates to:
+  /// **'分享给我'**
+  String get communityDirectedInbox;
+
+  /// No description provided for @communitySharePublicTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'改为公开分享？'**
+  String get communitySharePublicTitle;
+
+  /// No description provided for @communitySharePublicBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'这个 Bot 会出现在社区榜单。名单还留着，但公开期间不生效。'**
+  String get communitySharePublicBody;
+
+  /// No description provided for @communitySharePublic.
+  ///
+  /// In zh, this message translates to:
+  /// **'公开分享'**
+  String get communitySharePublic;
+
+  /// No description provided for @stopSharingFirst.
+  ///
+  /// In zh, this message translates to:
+  /// **'先停止公开分享，才能改为定向'**
+  String get stopSharingFirst;
+
+  /// No description provided for @cannotShareWithYourself.
+  ///
+  /// In zh, this message translates to:
+  /// **'不能分享给自己'**
+  String get cannotShareWithYourself;
+
+  /// No description provided for @userNotFound.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有这个用户'**
+  String get userNotFound;
+
   /// No description provided for @communityShareStopTitle.
   ///
   /// In zh, this message translates to:

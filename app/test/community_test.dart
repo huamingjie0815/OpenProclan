@@ -54,16 +54,15 @@ void main() {
   testWidgets('search lists matches and does not open a bot', (tester) async {
     final community = _Community(
       likes: [_bot(name: '日报', likes: 3, rank: 1)],
-      found: [
-        _bot(name: '晚报', code: 'ABCD2345', listed: false, rank: null),
-      ],
-      details: {
-        '晚报': _bot(name: '晚报', code: 'ABCD2345', listed: false),
-      },
+      found: [_bot(name: '晚报', code: 'ABCD2345', listed: false, rank: null)],
+      details: {'晚报': _bot(name: '晚报', code: 'ABCD2345', listed: false)},
     );
     await _pump(tester, community);
 
-    await tester.enterText(find.byKey(const Key('community-search')), ' abcd2345 ');
+    await tester.enterText(
+      find.byKey(const Key('community-search')),
+      ' abcd2345 ',
+    );
     await tester.pumpAndSettle();
 
     expect(community.searched, 'abcd2345');
@@ -82,123 +81,129 @@ void main() {
     expect(_pressed(tester, 'community-dislike'), isNull);
   });
 
-  testWidgets('guest actions follow the listing and an original has no delete', (
-    tester,
-  ) async {
-    final card = _card();
-    final community = _Community(
-      likes: [
-        _bot(name: '日报', likes: 4, rank: 1),
-        _bot(name: '停更', rank: 2),
-        _bot(name: '仍关注', rank: 3),
-      ],
-      details: {
-        '日报': _bot(name: '日报', likes: 4, card: card),
-        '停更': _bot(name: '停更', listed: false),
-        '仍关注': _bot(name: '仍关注', listed: false, following: true),
-      },
-    );
-    await _pump(tester, community, feed: FakeFeedClient(const []));
+  testWidgets(
+    'guest actions follow the listing and an original has no delete',
+    (tester) async {
+      final card = _card();
+      final community = _Community(
+        likes: [
+          _bot(name: '日报', likes: 4, rank: 1),
+          _bot(name: '停更', rank: 2),
+          _bot(name: '仍关注', rank: 3),
+        ],
+        details: {
+          '日报': _bot(name: '日报', likes: 4, card: card),
+          '停更': _bot(name: '停更', listed: false),
+          '仍关注': _bot(name: '仍关注', listed: false, following: true),
+        },
+      );
+      await _pump(tester, community, feed: FakeFeedClient(const []));
 
-    await tester.tap(find.byKey(const Key('community-row-u1-日报')));
-    await tester.pumpAndSettle();
-    expect(_pressed(tester, 'community-follow'), isNotNull);
-    expect(_pressed(tester, 'community-like'), isNotNull);
-    expect(find.text('关注'), findsWidgets);
-    expect(find.text('已关注'), findsNothing);
+      await tester.tap(find.byKey(const Key('community-row-u1-日报')));
+      await tester.pumpAndSettle();
+      expect(_pressed(tester, 'community-follow'), isNotNull);
+      expect(_pressed(tester, 'community-like'), isNotNull);
+      expect(find.text('关注'), findsWidgets);
+      expect(find.text('已关注'), findsNothing);
 
-    await tester.ensureVisible(find.byKey(const Key('community-card-c1')));
-    await tester.tap(find.byKey(const Key('community-card-c1')));
-    await tester.pumpAndSettle();
-    expect(find.text('正文', findRichText: true), findsOneWidget);
-    expect(find.text('删除卡片'), findsNothing);
-    expect(find.text('标记为未读'), findsNothing);
-    expect(find.text('日报 · 林间'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('community-card-c1')));
+      await tester.tap(find.byKey(const Key('community-card-c1')));
+      await tester.pumpAndSettle();
+      expect(find.text('正文', findRichText: true), findsOneWidget);
+      expect(find.text('删除卡片'), findsNothing);
+      expect(find.text('标记为未读'), findsNothing);
+      expect(find.text('日报 · 林间'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('detail-back')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('community-back')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('detail-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('community-back')));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('community-row-u1-停更')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('community-offline')), findsOneWidget);
-    expect(_pressed(tester, 'community-follow'), isNull);
-    expect(_pressed(tester, 'community-like'), isNull);
-    expect(_pressed(tester, 'community-dislike'), isNull);
+      await tester.tap(find.byKey(const Key('community-row-u1-停更')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('community-offline')), findsOneWidget);
+      expect(_pressed(tester, 'community-follow'), isNull);
+      expect(_pressed(tester, 'community-like'), isNull);
+      expect(_pressed(tester, 'community-dislike'), isNull);
 
-    await tester.tap(find.byKey(const Key('community-back')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('community-row-u1-仍关注')));
-    await tester.pumpAndSettle();
-    expect(
-      tester.widget<IconButton>(find.byKey(const Key('community-follow'))).tooltip,
-      '取消关注',
-    );
-    expect(_pressed(tester, 'community-follow'), isNotNull);
-    expect(_pressed(tester, 'community-like'), isNull);
-    expect(_pressed(tester, 'community-dislike'), isNull);
-  });
+      await tester.tap(find.byKey(const Key('community-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('community-row-u1-仍关注')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const Key('community-follow')))
+            .tooltip,
+        '取消关注',
+      );
+      expect(_pressed(tester, 'community-follow'), isNotNull);
+      expect(_pressed(tester, 'community-like'), isNull);
+      expect(_pressed(tester, 'community-dislike'), isNull);
+    },
+  );
 
-  testWidgets('followed bots stay grouped on the bots page and copies stay deletable', (
-    tester,
-  ) async {
-    final community = _Community(
-      groups: [
-        CommunityGroup(
+  testWidgets(
+    'followed bots stay grouped on the bots page and copies stay deletable',
+    (tester) async {
+      final community = _Community(
+        groups: [
+          CommunityGroup(
+            ownerId: 'u2',
+            ownerName: '林间',
+            bots: const [
+              FollowedBot(name: '日报', listed: false, botDesc: ''),
+              FollowedBot(name: '晚报', listed: true, botDesc: ''),
+            ],
+          ),
+        ],
+        copyPage: CommunityCopies(
           ownerId: 'u2',
           ownerName: '林间',
-          bots: const [
-            FollowedBot(name: '日报', listed: false, botDesc: ''),
-            FollowedBot(name: '晚报', listed: true, botDesc: ''),
-          ],
+          name: '日报',
+          listed: false,
+          botDesc: '',
+          cards: [_card()],
         ),
-      ],
-      copyPage: CommunityCopies(
-        ownerId: 'u2',
-        ownerName: '林间',
-        name: '日报',
-        listed: false,
-        botDesc: '',
-        cards: [_card()],
-      ),
-    );
-    await tester.pumpWidget(
-      ProclanApp(
-        locale: const Locale('zh'),
-        client: FakeFeedClient(const []),
-        pollEvery: null,
-        community: community,
-        account: AccountClient(
-          baseUrl: 'http://127.0.0.1:9',
-          httpClient: _QuietAccount(),
+      );
+      await tester.pumpWidget(
+        ProclanApp(
+          locale: const Locale('zh'),
+          client: FakeFeedClient(const []),
+          pollEvery: null,
+          community: community,
+          account: AccountClient(
+            baseUrl: 'http://127.0.0.1:9',
+            httpClient: _QuietAccount(),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('open-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('drawer-bots')));
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('open-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('drawer-bots')));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('community-user-u2')), findsOneWidget);
-    expect(find.text('已下线'), findsOneWidget);
-    expect(find.byKey(const Key('followed-u2-晚报')), findsOneWidget);
-    expect(find.byKey(const Key('community-search')), findsNothing);
-    expect(community.searched, isNull);
+      expect(find.byKey(const Key('community-user-u2')), findsOneWidget);
+      expect(find.text('已下线'), findsOneWidget);
+      expect(find.byKey(const Key('followed-u2-晚报')), findsOneWidget);
+      expect(find.byKey(const Key('community-search')), findsNothing);
+      expect(community.searched, isNull);
 
-    await tester.tap(find.byKey(const Key('followed-u2-日报')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('community-offline')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('community-card-c1')));
-    await tester.tap(find.byKey(const Key('community-card-c1')));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('删除卡片'));
-    expect(find.text('删除卡片'), findsOneWidget);
-    expect(find.text('标记为未读'), findsOneWidget);
-  });
+      await tester.tap(find.byKey(const Key('followed-u2-日报')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('community-offline')), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('community-card-c1')));
+      await tester.tap(find.byKey(const Key('community-card-c1')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('删除卡片'));
+      expect(find.text('删除卡片'), findsOneWidget);
+      expect(find.text('标记为未读'), findsOneWidget);
+    },
+  );
 
-  testWidgets('owner share switch confirms only when turning off', (tester) async {
+  testWidgets('owner share switch confirms only when turning off', (
+    tester,
+  ) async {
     final httpClient = _ShareAccount();
     await tester.pumpWidget(
       ProclanApp(
@@ -221,14 +226,20 @@ void main() {
 
     expect(find.text('ABCD2345'), findsOneWidget);
     expect(find.text('短码 ABCD2345 · 3 点赞 · 2 关注'), findsOneWidget);
-    expect(tester.widget<Switch>(find.byKey(const Key('share-community'))).value, isFalse);
+    expect(
+      tester.widget<Switch>(find.byKey(const Key('share-community'))).value,
+      isFalse,
+    );
 
     await tester.ensureVisible(find.byKey(const Key('share-community')));
     await tester.tap(find.byKey(const Key('share-community')));
     await tester.pumpAndSettle();
     expect(find.text('停止分享？'), findsNothing);
     expect(httpClient.calls, ['share']);
-    expect(tester.widget<Switch>(find.byKey(const Key('share-community'))).value, isTrue);
+    expect(
+      tester.widget<Switch>(find.byKey(const Key('share-community'))).value,
+      isTrue,
+    );
 
     await tester.tap(find.byKey(const Key('share-community')));
     await tester.pumpAndSettle();
@@ -236,16 +247,172 @@ void main() {
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
     expect(httpClient.calls, ['share']);
-    expect(tester.widget<Switch>(find.byKey(const Key('share-community'))).value, isTrue);
+    expect(
+      tester.widget<Switch>(find.byKey(const Key('share-community'))).value,
+      isTrue,
+    );
 
     await tester.tap(find.byKey(const Key('share-community')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('停止分享'));
     await tester.pumpAndSettle();
     expect(httpClient.calls, ['share', 'unshare']);
-    expect(tester.widget<Switch>(find.byKey(const Key('share-community'))).value, isFalse);
+    expect(
+      tester.widget<Switch>(find.byKey(const Key('share-community'))).value,
+      isFalse,
+    );
     expect(find.byKey(const Key('community-code')), findsOneWidget);
     expect(find.text('ABCD2345'), findsOneWidget);
+  });
+
+  testWidgets('the owner can add and remove people on the directed list', (
+    tester,
+  ) async {
+    final httpClient = _RosterAccount();
+    await tester.pumpWidget(
+      ProclanApp(
+        locale: const Locale('zh'),
+        client: FakeFeedClient(const []),
+        pollEvery: null,
+        account: AccountClient(
+          baseUrl: 'http://127.0.0.1:9',
+          httpClient: httpClient,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('open-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawer-bots')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('bot-日报')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('只对名单中的人可见'), findsOneWidget);
+    expect(find.byKey(const Key('direct-person-Bea')), findsOneWidget);
+    expect(find.byKey(const Key('direct-person-Cy')), findsOneWidget);
+    expect(
+      tester.widget<Switch>(find.byKey(const Key('direct-community'))).value,
+      isTrue,
+    );
+
+    await tester.ensureVisible(find.byKey(const Key('direct-remove-Bea')));
+    await tester.tap(find.byKey(const Key('direct-remove-Bea')));
+    await tester.pumpAndSettle();
+    expect(find.text('移出名单？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '移出'));
+    await tester.pumpAndSettle();
+    expect(httpClient.calls, ['revoke']);
+    expect(find.byKey(const Key('direct-person-Bea')), findsNothing);
+    expect(find.byKey(const Key('direct-person-Cy')), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('direct-community')));
+    await tester.tap(find.byKey(const Key('direct-community')));
+    await tester.pumpAndSettle();
+    expect(find.text('暂停定向？'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '暂停'));
+    await tester.pumpAndSettle();
+    expect(httpClient.calls, ['revoke', 'direct-off']);
+    expect(find.text('定向已暂停'), findsWidgets);
+    expect(find.byKey(const Key('direct-person-Cy')), findsOneWidget);
+    expect(
+      tester.widget<Switch>(find.byKey(const Key('direct-community'))).value,
+      isFalse,
+    );
+
+    await tester.enterText(find.byKey(const Key('direct-username')), 'Dee');
+    await tester.tap(find.byKey(const Key('direct-add')));
+    await tester.pumpAndSettle();
+    expect(httpClient.calls, ['revoke', 'direct-off', 'grant']);
+    expect(find.byKey(const Key('direct-person-Dee')), findsOneWidget);
+    expect(
+      tester.widget<Switch>(find.byKey(const Key('direct-community'))).value,
+      isFalse,
+    );
+  });
+
+  testWidgets(
+    'opening directed sharing stays put when outsiders still follow',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(900, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final httpClient = _RosterAccount()
+        ..listed = true
+        ..direct = false
+        ..blockDirect = true;
+      await tester.pumpWidget(
+        ProclanApp(
+          locale: const Locale('zh'),
+          client: FakeFeedClient(const []),
+          pollEvery: null,
+          account: AccountClient(
+            baseUrl: 'http://127.0.0.1:9',
+            httpClient: httpClient,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('open-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('drawer-bots')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bot-日报')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const Key('direct-community')));
+      await tester.tap(find.byKey(const Key('direct-community')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('先停止公开分享，才能改为定向'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Switch>(find.byKey(const Key('share-community'))).value,
+        isTrue,
+      );
+      expect(
+        tester.widget<Switch>(find.byKey(const Key('direct-community'))).value,
+        isFalse,
+      );
+      expect(httpClient.calls, ['direct-on']);
+    },
+  );
+
+  testWidgets('a directed bot on the bots page can be followed without votes', (
+    tester,
+  ) async {
+    final guest = _bot(
+      name: '晚报',
+      listed: false,
+      direct: true,
+      code: 'ABCD2345',
+    );
+    final community = _Community(inbox: [guest], details: {'晚报': guest});
+    await tester.pumpWidget(
+      ProclanApp(
+        locale: const Locale('zh'),
+        client: FakeFeedClient(const []),
+        pollEvery: null,
+        community: community,
+        account: AccountClient(
+          baseUrl: 'http://127.0.0.1:9',
+          httpClient: _QuietAccount(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('open-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('drawer-bots')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('community-directed')), findsOneWidget);
+    expect(find.byKey(const Key('directed-u1-晚报')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('directed-u1-晚报')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('community-offline')), findsNothing);
+    expect(_pressed(tester, 'community-follow'), isNotNull);
+    expect(_pressed(tester, 'community-like'), isNull);
+    expect(_pressed(tester, 'community-dislike'), isNull);
   });
 
   testWidgets('a copied card names the bot and its owner', (tester) async {
@@ -294,6 +461,7 @@ CommunityBot _bot({
   int? rank = 1,
   bool following = false,
   int vote = 0,
+  bool direct = false,
   FeedCard? card,
 }) {
   return CommunityBot(
@@ -308,6 +476,7 @@ CommunityBot _bot({
     follows: follows,
     rank: rank,
     following: following,
+    direct: direct,
     card: card,
   );
 }
@@ -340,6 +509,7 @@ class _Community implements CommunityClient {
     this.found = const [],
     this.details = const {},
     this.groups = const [],
+    this.inbox = const [],
     this.copyPage,
   });
 
@@ -348,6 +518,7 @@ class _Community implements CommunityClient {
   final List<CommunityBot> found;
   final Map<String, CommunityBot> details;
   final List<CommunityGroup> groups;
+  final List<CommunityBot> inbox;
   final CommunityCopies? copyPage;
   String? searched;
   var lookups = 0;
@@ -364,13 +535,19 @@ class _Community implements CommunityClient {
   }
 
   @override
-  Future<CommunityBot> bot({required String ownerId, required String name}) async {
+  Future<CommunityBot> bot({
+    required String ownerId,
+    required String name,
+  }) async {
     lookups += 1;
     return details[name]!;
   }
 
   @override
   Future<List<CommunityGroup>> following() async => groups;
+
+  @override
+  Future<List<CommunityBot>> directed() async => inbox;
 
   @override
   Future<CommunityCopies> copies({
@@ -384,7 +561,10 @@ class _Community implements CommunityClient {
   Future<void> follow({required String ownerId, required String name}) async {}
 
   @override
-  Future<void> unfollow({required String ownerId, required String name}) async {}
+  Future<void> unfollow({
+    required String ownerId,
+    required String name,
+  }) async {}
 
   @override
   Future<void> vote({
@@ -458,6 +638,74 @@ class _ShareAccount extends http.BaseClient {
     return http.StreamedResponse(
       Stream.value(utf8.encode(body)),
       200,
+      headers: {'content-type': 'application/json'},
+    );
+  }
+}
+
+class _RosterAccount extends http.BaseClient {
+  var listed = false;
+  var direct = true;
+  var blockDirect = false;
+  var audience = ['Bea', 'Cy'];
+  final calls = <String>[];
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final path = request.url.path;
+    if (request.method == 'GET' && path == '/v1/me') {
+      return _json('{"id":"u","username":"林间"}');
+    }
+    if (request.method == 'GET' && path == '/v1/me/bot-token') {
+      return _json('{"token":"bot-secret"}');
+    }
+    if (request.method == 'GET' && path == '/v1/bots') {
+      return _json('{"bots":[{"name":"日报"}]}');
+    }
+    if (request.method == 'POST' && path == '/v1/community/direct') {
+      calls.add('grant');
+      final parsed = jsonDecode((request as http.Request).body);
+      final username = parsed['username'] as String;
+      if (!audience.contains(username)) {
+        audience = [...audience, username];
+      }
+      return _json('{}');
+    }
+    if (request.method == 'DELETE' && path == '/v1/community/direct') {
+      calls.add('revoke');
+      audience = [
+        for (final name in audience)
+          if (name != request.url.queryParameters['username']) name,
+      ];
+      return _json('{}');
+    }
+    if (request.method == 'POST' && path == '/v1/community/direct/active') {
+      final parsed = jsonDecode((request as http.Request).body);
+      final on = parsed['on'] == true;
+      calls.add(on ? 'direct-on' : 'direct-off');
+      if (on && blockDirect) {
+        return _json('{"detail":"stop sharing first"}', status: 409);
+      }
+      direct = on;
+      if (on) {
+        listed = false;
+      }
+      return _json('{}');
+    }
+    if (request.method == 'GET' && path == '/v1/bots/profile') {
+      final names = audience.map((item) => '"$item"').join(',');
+      return _json(
+        '{"name":"日报","first_seen":"2026-10-27T01:02:03Z","bot_desc":"盯着模型价格。","cards":[],'
+        '"community":{"listed":$listed,"direct":$direct,"code":"ABCD2345","likes":0,"dislikes":0,"follows":0,"audience":[$names]}}',
+      );
+    }
+    return http.StreamedResponse(const Stream.empty(), 404);
+  }
+
+  http.StreamedResponse _json(String body, {int status = 200}) {
+    return http.StreamedResponse(
+      Stream.value(utf8.encode(body)),
+      status,
       headers: {'content-type': 'application/json'},
     );
   }

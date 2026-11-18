@@ -26,6 +26,16 @@ class _Vote(BaseModel):
     vote: int
 
 
+class _Grant(BaseModel):
+    name: str
+    username: str
+
+
+class _Direct(BaseModel):
+    name: str
+    on: bool
+
+
 def register_community(
     app: FastAPI,
     store: Store,
@@ -46,6 +56,24 @@ def register_community(
     @app.delete("/v1/community/share")
     def unshare(request: Request, name: str) -> dict:
         return fail(lambda: store.unshare_bot(request.state.user_id, name))
+
+    @app.post("/v1/community/direct")
+    def grant(request: Request, body: _Grant) -> dict:
+        return fail(
+            lambda: store.grant_bot(request.state.user_id, body.name, body.username)
+        )
+
+    @app.delete("/v1/community/direct")
+    def revoke(request: Request, name: str, username: str) -> dict:
+        return fail(lambda: store.revoke_bot(request.state.user_id, name, username))
+
+    @app.post("/v1/community/direct/active")
+    def direct(request: Request, body: _Direct) -> dict:
+        return fail(lambda: store.set_direct(request.state.user_id, body.name, body.on))
+
+    @app.get("/v1/community/directed")
+    def directed(request: Request) -> dict:
+        return {"bots": store.community_directed(request.state.user_id)}
 
     @app.post("/v1/community/follow", status_code=204)
     def follow(request: Request, body: _Target) -> None:
@@ -73,8 +101,8 @@ def register_community(
         return {"bots": store.community_board(kind)}
 
     @app.get("/v1/community/search")
-    def search(q: str = "") -> dict:
-        return {"bots": store.community_search(q)}
+    def search(request: Request, q: str = "") -> dict:
+        return {"bots": store.community_search(request.state.user_id, q)}
 
     @app.get("/v1/community/bot")
     def bot(request: Request, owner_id: str, name: str) -> dict:

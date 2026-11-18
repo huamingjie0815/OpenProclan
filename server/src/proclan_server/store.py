@@ -180,10 +180,22 @@ class Store:
                     shared_at TEXT NOT NULL,
                     listed INTEGER NOT NULL,
                     bot_desc TEXT NOT NULL DEFAULT '',
+                    direct INTEGER NOT NULL DEFAULT 0,
+                    opened INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (owner_id, bot_name)
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS community_bots_code
                     ON community_bots(code);
+
+                CREATE TABLE IF NOT EXISTS community_grants (
+                    owner_id TEXT NOT NULL,
+                    bot_name TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (owner_id, bot_name, user_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_community_grants_user
+                    ON community_grants(user_id);
 
                 CREATE TABLE IF NOT EXISTS follows (
                     follower_id TEXT NOT NULL,
@@ -229,6 +241,16 @@ class Store:
                     conn.execute(
                         f"ALTER TABLE cards ADD COLUMN {column} TEXT NOT NULL DEFAULT '[]'"
                     )
+            community = {row[1] for row in conn.execute("PRAGMA table_info(community_bots)")}
+            if "direct" not in community:
+                conn.execute(
+                    "ALTER TABLE community_bots ADD COLUMN direct INTEGER NOT NULL DEFAULT 0"
+                )
+            if "opened" not in community:
+                conn.execute(
+                    "ALTER TABLE community_bots ADD COLUMN opened INTEGER NOT NULL DEFAULT 0"
+                )
+                conn.execute("UPDATE community_bots SET opened = 1")
 
     def publish_batch(
         self,
@@ -385,7 +407,10 @@ class Store:
                 (user_id, name),
             )
             conn.execute(
-                "UPDATE community_bots SET listed = 0 WHERE owner_id = ? AND bot_name = ?",
+                """
+                UPDATE community_bots SET listed = 0, direct = 0
+                WHERE owner_id = ? AND bot_name = ?
+                """,
                 (user_id, name),
             )
         return cursor.rowcount == 1
@@ -681,8 +706,8 @@ class Store:
                 conn.execute(
                     """
                     INSERT INTO community_bots
-                        (owner_id, bot_name, code, shared_at, listed, bot_desc)
-                    VALUES (?, ?, ?, ?, 1, ?)
+                        (owner_id, bot_name, code, shared_at, listed, bot_desc, direct, opened)
+                    VALUES (?, ?, ?, ?, 1, ?, 0, 1)
                     """,
                     (owner_id, name, _fresh_code(conn), moment, bot["bot_desc"]),
                 )
@@ -690,10 +715,83 @@ class Store:
                 conn.execute(
                     """
                     UPDATE community_bots
-                    SET listed = 1, bot_desc = ?
+                    SET listed = 1, direct = 0, opened = 1, bot_desc = ?
                     WHERE owner_id = ? AND bot_name = ?
                     """,
                     (bot["bot_desc"], owner_id, name),
+                )
+            return _community_owner(conn, owner_id, name)
+
+    def grant_bot(self, owner_id: str, name: str, username: str) -> dict:
+        person = _person_name(username)
+        with self._write() as conn:
+            _require_bot(conn, owner_id, name)
+            user_id = _user_id_by_name(conn, person)
+            if user_id == owner_id:
+                raise CommunityError(400, "cannot share with yourself")
+            conn.execute(
+                """
+                INSERT INTO community_grants (owner_id, bot_name, user_id, created_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(owner_id, bot_name, user_id) DO NOTHING
+                """,
+                (owner_id, name, user_id, now().isoformat()),
+            )
+            return _community_owner(conn, owner_id, name)
+
+    def revoke_bot(self, owner_id: str, name: str, username: str) -> dict:
+        person = _person_name(username)
+        with self._write() as conn:
+            _require_bot(conn, owner_id, name)
+            user_id = _user_id_by_name(conn, person)
+            conn.execute(
+                """
+                DELETE FROM community_grants
+                WHERE owner_id = ? AND bot_name = ? AND user_id = ?
+                """,
+                (owner_id, name, user_id),
+            )
+            return _community_owner(conn, owner_id, name)
+
+    def set_direct(self, owner_id: str, name: str, on: bool) -> dict:
+        moment = now().isoformat()
+        with self._write() as conn:
+            bot = _require_bot(conn, owner_id, name)
+            row = conn.execute(
+                """
+                SELECT listed FROM community_bots
+                WHERE owner_id = ? AND bot_name = ?
+                """,
+                (owner_id, name),
+            ).fetchone()
+            if on:
+                if row is not None and row["listed"] and _outside_follower(conn, owner_id, name):
+                    raise CommunityError(409, "stop sharing first")
+                if row is None:
+                    conn.execute(
+                        """
+                        INSERT INTO community_bots
+                            (owner_id, bot_name, code, shared_at, listed, bot_desc, direct, opened)
+                        VALUES (?, ?, ?, ?, 0, ?, 1, 0)
+                        """,
+                        (owner_id, name, _fresh_code(conn), moment, bot["bot_desc"]),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        UPDATE community_bots
+                        SET listed = 0, direct = 1, bot_desc = ?
+                        WHERE owner_id = ? AND bot_name = ?
+                        """,
+                        (bot["bot_desc"], owner_id, name),
+                    )
+            elif row is not None:
+                conn.execute(
+                    """
+                    UPDATE community_bots SET direct = 0
+                    WHERE owner_id = ? AND bot_name = ?
+                    """,
+                    (owner_id, name),
                 )
             return _community_owner(conn, owner_id, name)
 
@@ -721,7 +819,7 @@ class Store:
         if follower_id == owner_id:
             raise CommunityError(400, "cannot follow yourself")
         with self._write() as conn:
-            _require_listed(conn, owner_id, name)
+            _require_receivable(conn, follower_id, owner_id, name)
             conn.execute(
                 """
                 INSERT INTO follows (follower_id, owner_id, bot_name, created_at)
@@ -782,7 +880,7 @@ class Store:
             ).fetchall()
         return [_public_bot(row, rank=index + 1) for index, row in enumerate(rows)]
 
-    def community_search(self, query: str) -> list[dict]:
+    def community_search(self, viewer_id: str, query: str) -> list[dict]:
         text = "".join(query.split())
         if not text:
             return []
@@ -795,7 +893,7 @@ class Store:
                     f"{_COMMUNITY_SELECT} WHERE c.code = ? COLLATE NOCASE",
                     (code,),
                 ).fetchone()
-                if row is not None:
+                if row is not None and _code_visible(conn, row, viewer_id):
                     found.append(_public_bot(row))
                     skip = (row["owner_id"], row["bot_name"])
             needle = _like(query.strip())
@@ -839,6 +937,8 @@ class Store:
                 """,
                 (viewer_id, owner_id, name),
             ).fetchone()
+            if not _visible(conn, row, viewer_id, following=follow is not None):
+                raise CommunityError(404, "bot not found")
             vote = conn.execute(
                 """
                 SELECT vote FROM bot_votes
@@ -846,13 +946,37 @@ class Store:
                 """,
                 (viewer_id, owner_id, name),
             ).fetchone()
+            direct = _direct_for(conn, row, viewer_id)
             card = _latest_original(conn, owner_id, name, not_before)
         body = _public_bot(row)
+        body["direct"] = direct
         body["following"] = follow is not None
         body["vote"] = int(vote["vote"]) if vote is not None else 0
         body["mine"] = viewer_id == owner_id
         body["card"] = card
         return body
+
+    def community_directed(self, viewer_id: str) -> list[dict]:
+        with self._read() as conn:
+            rows = conn.execute(
+                f"""
+                {_COMMUNITY_SELECT}
+                WHERE c.direct = 1
+                  AND EXISTS (
+                    SELECT 1 FROM community_grants g
+                    WHERE g.owner_id = c.owner_id AND g.bot_name = c.bot_name
+                      AND g.user_id = ?
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM follows f
+                    WHERE f.follower_id = ? AND f.owner_id = c.owner_id
+                      AND f.bot_name = c.bot_name
+                  )
+                ORDER BY u.username COLLATE NOCASE, c.bot_name ASC
+                """,
+                (viewer_id, viewer_id),
+            ).fetchall()
+        return [_public_bot(row) for row in rows]
 
     def community_following(self, follower_id: str) -> list[dict]:
         with self._read() as conn:
@@ -860,7 +984,15 @@ class Store:
                 """
                 SELECT f.owner_id, f.bot_name, u.username AS owner_name,
                        COALESCE(c.listed, 0) AS listed,
-                       COALESCE(c.bot_desc, '') AS bot_desc
+                       COALESCE(c.bot_desc, '') AS bot_desc,
+                       CASE
+                         WHEN c.direct = 1 AND EXISTS (
+                           SELECT 1 FROM community_grants g
+                           WHERE g.owner_id = f.owner_id AND g.bot_name = f.bot_name
+                             AND g.user_id = f.follower_id
+                         ) THEN 1
+                         ELSE 0
+                       END AS direct
                 FROM follows f
                 JOIN users u ON u.id = f.owner_id
                 LEFT JOIN community_bots c
@@ -886,6 +1018,7 @@ class Store:
                 {
                     "name": row["bot_name"],
                     "listed": bool(row["listed"]),
+                    "direct": bool(row["direct"]),
                     "bot_desc": row["bot_desc"],
                 }
             )
@@ -908,11 +1041,34 @@ class Store:
                 raise CommunityError(404, "bot not found")
             community = conn.execute(
                 """
-                SELECT listed, bot_desc FROM community_bots
+                SELECT listed, direct, opened, bot_desc FROM community_bots
                 WHERE owner_id = ? AND bot_name = ?
                 """,
                 (owner_id, name),
             ).fetchone()
+            follow = conn.execute(
+                """
+                SELECT 1 FROM follows
+                WHERE follower_id = ? AND owner_id = ? AND bot_name = ?
+                """,
+                (viewer_id, owner_id, name),
+            ).fetchone()
+            if community is not None and not _visible(
+                conn,
+                {
+                    "owner_id": owner_id,
+                    "bot_name": name,
+                    "listed": community["listed"],
+                    "direct": community["direct"],
+                    "opened": community["opened"],
+                },
+                viewer_id,
+                following=follow is not None,
+            ):
+                raise CommunityError(404, "bot not found")
+            direct = community is not None and bool(community["direct"]) and (
+                viewer_id == owner_id or _granted(conn, owner_id, name, viewer_id)
+            )
             sql = (
                 f"{_CARD_SELECT} WHERE cards.user_id = ? AND cards.source_user_id = ?"
                 " AND cards.source_bot_name = ?"
@@ -928,6 +1084,7 @@ class Store:
             "owner_name": owner["username"],
             "name": name,
             "listed": bool(community["listed"]) if community is not None else False,
+            "direct": direct,
             "bot_desc": community["bot_desc"] if community is not None else "",
             "cards": cards,
         }
@@ -978,7 +1135,7 @@ LEFT JOIN users AS source_user ON source_user.id = cards.source_user_id
 """
 
 _COMMUNITY_SELECT = """
-SELECT c.owner_id, c.bot_name, c.code, c.shared_at, c.listed, c.bot_desc,
+SELECT c.owner_id, c.bot_name, c.code, c.shared_at, c.listed, c.direct, c.opened, c.bot_desc,
        u.username AS owner_name,
        (SELECT COUNT(*) FROM bot_votes v
         WHERE v.owner_id = c.owner_id AND v.bot_name = c.bot_name AND v.vote = 1) AS likes,
@@ -1012,23 +1169,151 @@ def _require_listed(conn: sqlite3.Connection, owner_id: str, name: str) -> None:
         raise CommunityError(409, "not shared")
 
 
-def _community_owner(conn: sqlite3.Connection, owner_id: str, name: str) -> dict:
+def _require_receivable(
+    conn: sqlite3.Connection,
+    follower_id: str,
+    owner_id: str,
+    name: str,
+) -> None:
     row = conn.execute(
         """
-        SELECT code, listed FROM community_bots
+        SELECT listed, direct FROM community_bots
         WHERE owner_id = ? AND bot_name = ?
         """,
         (owner_id, name),
     ).fetchone()
     if row is None:
-        return {"listed": False, "code": None, "likes": 0, "dislikes": 0, "follows": 0}
+        raise CommunityError(409, "not shared")
+    if row["listed"]:
+        return
+    if row["direct"] and _granted(conn, owner_id, name, follower_id):
+        return
+    raise CommunityError(409, "not shared")
+
+
+def _person_name(value: str) -> str:
+    name = value.strip()
+    if not name or len(name) > 32 or "\n" in name or "\r" in name:
+        raise CommunityError(400, "invalid username")
+    return name
+
+
+def _require_bot(conn: sqlite3.Connection, owner_id: str, name: str) -> sqlite3.Row:
+    row = conn.execute(
+        "SELECT bot_desc FROM bot_names WHERE user_id = ? AND name = ?",
+        (owner_id, name),
+    ).fetchone()
+    if row is None:
+        raise CommunityError(404, "bot not found")
+    return row
+
+
+def _user_id_by_name(conn: sqlite3.Connection, username: str) -> str:
+    row = conn.execute(
+        "SELECT id FROM users WHERE username = ? COLLATE NOCASE",
+        (username,),
+    ).fetchone()
+    if row is None:
+        raise CommunityError(404, "user not found")
+    return row["id"]
+
+
+def _granted(conn: sqlite3.Connection, owner_id: str, name: str, user_id: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1 FROM community_grants
+        WHERE owner_id = ? AND bot_name = ? AND user_id = ?
+        """,
+        (owner_id, name, user_id),
+    ).fetchone()
+    return row is not None
+
+
+def _outside_follower(conn: sqlite3.Connection, owner_id: str, name: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1 FROM follows f
+        WHERE f.owner_id = ? AND f.bot_name = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM community_grants g
+            WHERE g.owner_id = f.owner_id AND g.bot_name = f.bot_name
+              AND g.user_id = f.follower_id
+          )
+        LIMIT 1
+        """,
+        (owner_id, name),
+    ).fetchone()
+    return row is not None
+
+
+def _audience(conn: sqlite3.Connection, owner_id: str, name: str) -> list[str]:
+    rows = conn.execute(
+        """
+        SELECT u.username
+        FROM community_grants g
+        JOIN users u ON u.id = g.user_id
+        WHERE g.owner_id = ? AND g.bot_name = ?
+        ORDER BY g.created_at ASC, u.username COLLATE NOCASE
+        """,
+        (owner_id, name),
+    ).fetchall()
+    return [row["username"] for row in rows]
+
+
+def _visible(conn: sqlite3.Connection, row, viewer_id: str, *, following: bool) -> bool:
+    if viewer_id == row["owner_id"] or following or row["listed"]:
+        return True
+    if row["direct"]:
+        return _granted(conn, row["owner_id"], row["bot_name"], viewer_id)
+    return bool(row["opened"])
+
+
+def _direct_for(conn: sqlite3.Connection, row, viewer_id: str) -> bool:
+    if not row["direct"]:
+        return False
+    if viewer_id == row["owner_id"]:
+        return True
+    return _granted(conn, row["owner_id"], row["bot_name"], viewer_id)
+
+
+def _code_visible(conn: sqlite3.Connection, row, viewer_id: str) -> bool:
+    if row["listed"]:
+        return True
+    if row["direct"]:
+        return viewer_id == row["owner_id"] or _granted(
+            conn, row["owner_id"], row["bot_name"], viewer_id
+        )
+    return bool(row["opened"])
+
+
+def _community_owner(conn: sqlite3.Connection, owner_id: str, name: str) -> dict:
+    row = conn.execute(
+        """
+        SELECT code, listed, direct FROM community_bots
+        WHERE owner_id = ? AND bot_name = ?
+        """,
+        (owner_id, name),
+    ).fetchone()
+    audience = _audience(conn, owner_id, name)
+    if row is None:
+        return {
+            "listed": False,
+            "direct": False,
+            "code": None,
+            "likes": 0,
+            "dislikes": 0,
+            "follows": 0,
+            "audience": audience,
+        }
     likes, dislikes, follows = _counts(conn, owner_id, name)
     return {
         "listed": bool(row["listed"]),
+        "direct": bool(row["direct"]),
         "code": row["code"],
         "likes": likes,
         "dislikes": dislikes,
         "follows": follows,
+        "audience": audience,
     }
 
 
@@ -1065,6 +1350,7 @@ def _public_bot(row: sqlite3.Row, *, rank: int | None = None) -> dict:
         "bot_desc": row["bot_desc"],
         "code": row["code"],
         "listed": bool(row["listed"]),
+        "direct": bool(row["direct"]),
         "shared_at": row["shared_at"],
         "likes": int(row["likes"]),
         "dislikes": int(row["dislikes"]),
@@ -1137,22 +1423,34 @@ def _fan_out(conn: sqlite3.Connection, cards: list[Card]) -> None:
     for card in cards:
         if not card.user_id or card.source_user_id:
             continue
-        listed = conn.execute(
+        state = conn.execute(
             """
-            SELECT listed FROM community_bots
+            SELECT listed, direct FROM community_bots
             WHERE owner_id = ? AND bot_name = ?
             """,
             (card.user_id, card.created_bot),
         ).fetchone()
-        if listed is None or not listed["listed"]:
+        if state is None or (not state["listed"] and not state["direct"]):
             continue
-        followers = conn.execute(
-            """
-            SELECT follower_id FROM follows
-            WHERE owner_id = ? AND bot_name = ?
-            """,
-            (card.user_id, card.created_bot),
-        ).fetchall()
+        if state["listed"]:
+            followers = conn.execute(
+                """
+                SELECT follower_id FROM follows
+                WHERE owner_id = ? AND bot_name = ?
+                """,
+                (card.user_id, card.created_bot),
+            ).fetchall()
+        else:
+            followers = conn.execute(
+                """
+                SELECT f.follower_id FROM follows f
+                JOIN community_grants g
+                  ON g.owner_id = f.owner_id AND g.bot_name = f.bot_name
+                 AND g.user_id = f.follower_id
+                WHERE f.owner_id = ? AND f.bot_name = ?
+                """,
+                (card.user_id, card.created_bot),
+            ).fetchall()
         for follower in followers:
             follower_id = follower["follower_id"]
             if follower_id == card.user_id:
