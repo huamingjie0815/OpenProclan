@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:proclan_app/account_api.dart';
 import 'package:proclan_app/community_api.dart';
 import 'package:proclan_app/community_page.dart';
@@ -12,6 +13,53 @@ import 'package:proclan_app/main.dart';
 import 'widget_test.dart' show FakeFeedClient;
 
 void main() {
+  testWidgets('community handles offline boards and failed actions', (
+    tester,
+  ) async {
+    var offline = true;
+    final community = HttpCommunityClient(
+      baseUrl: 'https://example.com',
+      httpClient: MockClient((request) async {
+        if (offline || request.method == 'POST') {
+          throw http.ClientException('offline');
+        }
+        final bot = {
+          'owner_id': 'u1',
+          'owner_name': '林间',
+          'name': '日报',
+          'listed': true,
+        };
+        return http.Response(
+          jsonEncode(
+            request.url.path.endsWith('/board')
+                ? {
+                    'bots': [bot],
+                  }
+                : bot,
+          ),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }),
+    );
+    await _pump(tester, community);
+    expect(tester.takeException(), isNull);
+    expect(find.text('暂时连不上服务'), findsOneWidget);
+
+    offline = false;
+    await tester.tap(find.byKey(const Key('community-follows')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('community-row-u1-日报')));
+    await tester.pumpAndSettle();
+    for (final action in ['community-follow', 'community-like']) {
+      await tester.tap(find.byKey(Key(action)));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('暂时连不上服务'), findsOneWidget);
+      expect(_pressed(tester, action), isNotNull);
+    }
+  });
+
   testWidgets('drawer opens the community boards', (tester) async {
     final community = _Community(
       likes: [
@@ -79,6 +127,20 @@ void main() {
     expect(_pressed(tester, 'community-follow'), isNull);
     expect(_pressed(tester, 'community-like'), isNull);
     expect(_pressed(tester, 'community-dislike'), isNull);
+
+    await tester.tap(find.byKey(const Key('community-back')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('community-clear')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('community-row-u1-日报')), findsOneWidget);
+    expect(find.byKey(const Key('community-row-u1-晚报')), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('community-search')))
+          .controller!
+          .text,
+      isEmpty,
+    );
   });
 
   testWidgets(
@@ -460,7 +522,6 @@ CommunityBot _bot({
   int follows = 0,
   int? rank = 1,
   bool following = false,
-  int vote = 0,
   bool direct = false,
   FeedCard? card,
 }) {

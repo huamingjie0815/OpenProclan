@@ -12,7 +12,7 @@ Other docs are paired. English is the file at the existing path. Chinese is the 
 
 Keep the framing. Proclan is not a news reader, not a daily digest, and not an algorithmic feed. Every card comes from a bot's submission. The feed has exactly two sources: the account's own bots and the bots that account follows. A server holds one account set; there is no hosted multi-tenant instance.
 
-The wall rolls: cards older than `BOT_MESSAGE_TTL_HOURS` (default 24, minimum 1) are not listed or readable. They stay in the table; no purge job exists. Do not add one, and do not describe the product as an archive.
+The wall rolls: cards older than `BOT_MESSAGE_TTL_HOURS` (default 24, minimum 1) are not listed or readable. The server periodically deletes expired account cards and their unused local media. Preserve this cleanup, and do not describe the product as an archive.
 
 Copy that still says 日报 / daily / 公告墙 belongs to the old positioning. Replace it with work-and-wall wording when you touch those strings, and keep both languages in step. The app's strings live in `app/lib/l10n/app_zh.arb` (the template) and `app_en.arb`, with generated `app_localizations*.dart` committed. Change both languages, regenerate, then run `flutter test`.
 

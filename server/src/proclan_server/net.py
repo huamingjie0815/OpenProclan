@@ -11,10 +11,14 @@ from urllib.parse import urlparse
 
 
 def is_public_url(url: str) -> bool:
-    parsed = urlparse(url)
+    try:
+        parsed = urlparse(url)
+        parsed.port  # Validate the port as well as the host.
+    except ValueError:
+        return False
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         return False
-    host = parsed.hostname.strip("[]").lower()
+    host = parsed.hostname.rstrip(".").lower()
     if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
         return False
     try:

@@ -558,12 +558,19 @@ class Store:
         with self._write() as conn:
             conn.execute("UPDATE users SET username = ? WHERE id = ?", (username, user_id))
 
-    def set_password(self, user_id: str, password_hash: str) -> None:
+    def set_password(
+        self, user_id: str, password_hash: str, *, expected_hash: str | None = None,
+    ) -> bool:
         with self._write() as conn:
-            conn.execute(
-                "UPDATE users SET password_hash = ?, login_fails = 0, locked_until = NULL WHERE id = ?",
-                (password_hash, user_id),
-            )
+            sql = "UPDATE users SET password_hash = ?, login_fails = 0, locked_until = NULL WHERE id = ?"
+            params = [password_hash, user_id]
+            if expected_hash is not None:
+                sql += " AND password_hash = ?"
+                params.append(expected_hash)
+            if conn.execute(sql, params).rowcount != 1:
+                return False
+            conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+            return True
 
     def set_settings(
         self,
@@ -615,16 +622,26 @@ class Store:
                 (fails, user_id),
             )
 
-    def clear_login_failures(self, user_id: str) -> None:
-        with self._write() as conn:
-            conn.execute(
-                "UPDATE users SET login_fails = 0, locked_until = NULL WHERE id = ?",
-                (user_id,),
-            )
-
-    def create_session(self, user_id: str, *, expires_at: str) -> str:
+    def create_session(
+        self, user_id: str, *, expires_at: str, password_hash: str | None = None,
+    ) -> str | None:
         token = new_secret()
         with self._write() as conn:
+            if password_hash is not None:
+                user = conn.execute(
+                    "SELECT password_hash, locked_until FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
+                if (
+                    user is None
+                    or user["password_hash"] != password_hash
+                    or (user["locked_until"] and user["locked_until"] > now().isoformat())
+                ):
+                    return None
+                conn.execute(
+                    "UPDATE users SET login_fails = 0, locked_until = NULL WHERE id = ?",
+                    (user_id,),
+                )
             conn.execute(
                 "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
                 (digest(token), user_id, expires_at),
@@ -649,10 +666,6 @@ class Store:
     def delete_session(self, token: str) -> None:
         with self._write() as conn:
             conn.execute("DELETE FROM sessions WHERE token_hash = ?", (digest(token),))
-
-    def delete_sessions(self, user_id: str) -> None:
-        with self._write() as conn:
-            conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
 
     def set_bot_token(self, user_id: str, token: str) -> str:
         with self._write() as conn:
@@ -947,7 +960,9 @@ class Store:
                 (viewer_id, owner_id, name),
             ).fetchone()
             direct = _direct_for(conn, row, viewer_id)
-            card = _latest_original(conn, owner_id, name, not_before)
+            card = None
+            if not row["direct"] or direct:
+                card = _latest_original(conn, owner_id, name, not_before)
         body = _public_bot(row)
         body["direct"] = direct
         body["following"] = follow is not None

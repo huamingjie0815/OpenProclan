@@ -453,6 +453,14 @@ async def test_direct_share_is_invisible_and_copies_only_to_the_list(api):
     assert left.status_code == 200
     assert left.json()["direct"] is False
     assert left.json()["listed"] is False
+    assert left.json()["card"] is None
+    copies = await client.get(
+        "/v1/community/copies",
+        params={"owner_id": owner_id, "name": "日报"},
+        headers=bea_headers,
+    )
+    assert copies.status_code == 200
+    assert [item["title"] for item in copies.json()["cards"]] == ["之后"]
     await client.delete(
         "/v1/community/follow",
         params={"owner_id": owner_id, "name": "日报"},
@@ -557,6 +565,7 @@ async def test_public_share_must_stop_before_direct_when_outsiders_follow(api):
     )
     assert cy_detail.json()["direct"] is False
     assert cy_detail.json()["listed"] is False
+    assert cy_detail.json()["card"] is None
 
     public = await _share(client, owner_headers, "日报")
     assert public["listed"] is True

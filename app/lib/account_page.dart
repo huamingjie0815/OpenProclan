@@ -1474,23 +1474,20 @@ class _TocCard extends StatelessWidget {
 
 class _TocRow extends StatelessWidget {
   const _TocRow({
-    super.key,
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.danger = false,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? Red.dangerFg : Red.fg;
+    final color = Red.fg;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -1499,18 +1496,14 @@ class _TocRow extends StatelessWidget {
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
-                color: danger ? Red.dangerSoft : Red.surfaceWarm,
+                color: Red.surfaceWarm,
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: danger ? Red.dangerLine : Red.border),
+                border: Border.all(color: Red.border),
               ),
               child: SizedBox(
                 width: 36,
                 height: 36,
-                child: Icon(
-                  icon,
-                  size: 18,
-                  color: danger ? Red.dangerFg : Red.fg2,
-                ),
+                child: Icon(icon, size: 18, color: Red.fg2),
               ),
             ),
             const SizedBox(width: 14),
@@ -2002,27 +1995,19 @@ class _Switch extends StatelessWidget {
 class _LineField extends StatelessWidget {
   const _LineField({
     this.controller,
-    this.value,
     required this.label,
     this.secret = false,
-    this.readOnly = false,
     this.fieldKey,
   });
 
   final TextEditingController? controller;
-  final String? value;
   final String label;
   final bool secret;
-  final bool readOnly;
   final Key? fieldKey;
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = Red.text(
-      size: 15,
-      height: 1.2,
-      color: readOnly ? Red.meta : Red.fg,
-    );
+    final textStyle = Red.text(size: 15, height: 1.2, color: Red.fg);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2037,55 +2022,36 @@ class _LineField extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 7),
-        if (readOnly)
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Red.surfaceWarm,
+        TextField(
+          key: fieldKey,
+          controller: controller,
+          obscureText: secret,
+          autocorrect: false,
+          enableSuggestions: !secret,
+          style: textStyle,
+          cursorColor: Red.accent,
+          decoration: InputDecoration(
+            isCollapsed: true,
+            filled: true,
+            fillColor: Red.surfaceWarm,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 13,
+              vertical: 14,
+            ),
+            enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Red.border),
+              borderSide: BorderSide(color: Red.border),
             ),
-            child: SizedBox(
-              height: 46,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 13),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(value ?? '', style: textStyle),
-                ),
-              ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: Red.accent),
             ),
-          )
-        else
-          TextField(
-            key: fieldKey,
-            controller: controller,
-            obscureText: secret,
-            autocorrect: false,
-            enableSuggestions: !secret,
-            style: textStyle,
-            cursorColor: Red.accent,
-            decoration: InputDecoration(
-              isCollapsed: true,
-              filled: true,
-              fillColor: Red.surfaceWarm,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 13,
-                vertical: 14,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: Red.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: Red.accent),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: Red.border),
-              ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: Red.border),
             ),
           ),
+        ),
       ],
     );
   }

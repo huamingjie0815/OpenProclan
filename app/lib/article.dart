@@ -29,12 +29,41 @@ class ArticleChartMark extends ArticlePiece {
 
 final _chartLine = RegExp(r'^\[\[chart:(\d+)\]\]$');
 
-bool _fenceLine(String trimmed) => trimmed.startsWith('```');
+final _fencePattern = RegExp(r'^ {0,3}(`{3,}|~{3,})(.*)$');
+
+class _CodeFence {
+  String? _marker;
+  int _length = 0;
+
+  bool get active => _marker != null;
+
+  bool consume(String line) {
+    final match = _fencePattern.firstMatch(line);
+    if (match == null) {
+      return false;
+    }
+    final run = match.group(1)!;
+    final rest = match.group(2)!;
+    if (!active) {
+      if (run[0] == '`' && rest.contains('`')) {
+        return false;
+      }
+      _marker = run[0];
+      _length = run.length;
+      return true;
+    }
+    if (run[0] == _marker && run.length >= _length && rest.trim().isEmpty) {
+      _marker = null;
+      return true;
+    }
+    return false;
+  }
+}
 
 /// A line that can take a hard break. Block markers stay untouched so a list
 /// or a heading is not glued to the next line.
 bool _plainLine(String trimmed) {
-  if (trimmed.isEmpty || _fenceLine(trimmed)) {
+  if (trimmed.isEmpty || _fencePattern.hasMatch(trimmed)) {
     return false;
   }
   if (trimmed.startsWith('#') ||
@@ -53,17 +82,16 @@ bool _plainLine(String trimmed) {
 
 String _hardBreaks(String markdown) {
   final lines = markdown.split('\n');
-  var fence = false;
+  final fence = _CodeFence();
   final out = <String>[];
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
     final trimmed = line.trim();
-    if (_fenceLine(trimmed)) {
-      fence = !fence;
+    if (fence.consume(line)) {
       out.add(line);
       continue;
     }
-    if (!fence && i + 1 < lines.length) {
+    if (!fence.active && i + 1 < lines.length) {
       final next = lines[i + 1].trim();
       final broken = line.endsWith('  ') || line.endsWith('\\');
       if (_plainLine(trimmed) && _plainLine(next) && !broken) {
@@ -111,7 +139,7 @@ String articleHtml(String markdown) {
 List<ArticlePiece> articlePieces(String body) {
   final pieces = <ArticlePiece>[];
   final buffer = StringBuffer();
-  var fence = false;
+  final fence = _CodeFence();
 
   void flush() {
     final text = buffer.toString();
@@ -124,16 +152,16 @@ List<ArticlePiece> articlePieces(String body) {
 
   for (final line in body.split('\n')) {
     final trimmed = line.trim();
-    if (_fenceLine(trimmed)) {
-      fence = !fence;
+    if (fence.consume(line)) {
       buffer.writeln(line);
       continue;
     }
-    if (!fence) {
+    if (!fence.active) {
       final match = _chartLine.firstMatch(trimmed);
-      if (match != null) {
+      final index = match == null ? null : int.tryParse(match.group(1)!);
+      if (index != null) {
         flush();
-        pieces.add(ArticleChartMark(int.parse(match.group(1)!)));
+        pieces.add(ArticleChartMark(index));
         continue;
       }
     }
@@ -146,15 +174,17 @@ List<ArticlePiece> articlePieces(String body) {
 /// Drops a lone `[[chart:N]]` line. The same line inside a fence stays.
 String shareBody(String body) {
   final out = <String>[];
-  var fence = false;
+  final fence = _CodeFence();
   for (final line in body.split('\n')) {
     final trimmed = line.trim();
-    if (_fenceLine(trimmed)) {
-      fence = !fence;
+    if (fence.consume(line)) {
       out.add(line);
       continue;
     }
-    if (!fence && _chartLine.hasMatch(trimmed)) {
+    final match = _chartLine.firstMatch(trimmed);
+    if (!fence.active &&
+        match != null &&
+        int.tryParse(match.group(1)!) != null) {
       continue;
     }
     out.add(line);

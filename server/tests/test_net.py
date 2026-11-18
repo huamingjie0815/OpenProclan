@@ -1,3 +1,5 @@
+import pytest
+
 from proclan_server.net import is_public_url
 
 
@@ -10,3 +12,14 @@ def test_private_urls_are_refused():
     assert is_public_url("https://1.1.1.1/story")
     assert is_public_url("https://198.18.0.8/story")
     assert is_public_url("https://www.youtube.com/watch?v=jNQXAC9IVRw")
+
+
+@pytest.mark.parametrize("url", [
+    "https://[broken/image.png",
+    "https://example.com:wrong/image.png",
+    "https://example.com:70000/image.png",
+    "http://localhost./secret",
+    "http://service.local./secret",
+])
+def test_malformed_and_local_urls_are_refused(url):
+    assert not is_public_url(url)

@@ -9,6 +9,7 @@ from fastmcp import Client
 from httpx import ASGITransport, AsyncClient
 
 from proclan_server.app import create_app
+from proclan_server import accounts
 from proclan_server.categories import CATEGORIES
 from proclan_server.config import Settings
 from proclan_server.limits import NameCap, RateLimited
@@ -102,6 +103,82 @@ async def test_publish_stores_a_finished_card(api):
     assert [item["title"] for item in older.json()["cards"]] == ["汇率波动"]
     bad = await client.get("/v1/feed", params={"category": "八卦"}, headers=headers)
     assert bad.status_code == 400
+
+
+async def test_publish_preserves_submitted_text_and_drops_malformed_media(api):
+    client, app = api
+    owner = await _register(client)
+    submitted = card(
+        title="  保留标题  ",
+        summary=" 摘要 ",
+        body="    print('indented code')\n\n结尾  \n",
+        tags=[" AI "],
+        image_urls=["https://[broken/image.png"],
+        video_urls=["https://[broken/video.mp4"],
+    )
+    ids = publish_cards(
+        app.state.store, app.state.settings.media_dir, [submitted],
+        user_id=owner["user"]["id"],
+    )
+    response = await client.get(f"/v1/feed/{ids[0]}", headers=_auth(owner["token"]))
+    assert response.status_code == 200
+    for field in ("title", "summary", "body", "tags"):
+        assert response.json()[field] == submitted[field]
+    assert response.json()["images"] == []
+    assert response.json()["video_urls"] == []
+
+
+async def test_login_cannot_issue_a_session_for_a_replaced_password(api, monkeypatch):
+    client, app = api
+    owner = await _register(client)
+    verify = accounts.verify_password
+
+    def reset_during_verification(stored, password):
+        valid = verify(stored, password)
+        accounts.set_password_for(app.state.store, username="Ada", new_password="password-2")
+        return valid
+
+    monkeypatch.setattr(accounts, "verify_password", reset_during_verification)
+    response = await client.post(
+        "/v1/auth/login", json={"username": "Ada", "password": "password-1"},
+    )
+    assert response.status_code == 401
+    assert (await client.get("/v1/me", headers=_auth(owner["token"]))).status_code == 401
+
+
+async def test_password_change_cannot_overwrite_a_concurrent_reset(api, monkeypatch):
+    client, app = api
+    owner = await _register(client)
+    hash_password = accounts.hash_password
+
+    def reset_during_hashing(password):
+        app.state.store.set_password(owner["user"]["id"], hash_password("password-reset"))
+        return hash_password(password)
+
+    monkeypatch.setattr(accounts, "hash_password", reset_during_hashing)
+    response = await client.post(
+        "/v1/auth/password",
+        json={"current_password": "password-1", "new_password": "password-2"},
+        headers=_auth(owner["token"]),
+    )
+    assert response.status_code == 401
+    current = app.state.store.user_by_id(owner["user"]["id"])
+    assert accounts.verify_password(current.password_hash, "password-reset")
+
+
+async def test_password_update_rolls_back_when_session_revocation_fails(api):
+    _, app = api
+    user, token, _ = accounts.register(app.state.store, username="Ada", password="password-1")
+    with sqlite3.connect(app.state.store.path) as conn:
+        conn.execute("""
+            CREATE TRIGGER refuse_revocation BEFORE DELETE ON sessions
+            BEGIN SELECT RAISE(ABORT, 'revocation failed'); END
+        """)
+    with pytest.raises(sqlite3.IntegrityError, match="revocation failed"):
+        accounts.set_password_for(app.state.store, username="Ada", new_password="password-2")
+    current = app.state.store.user_by_id(user.id)
+    assert accounts.verify_password(current.password_hash, "password-1")
+    assert app.state.store.user_id_for_session(token, now=now().isoformat()) == user.id
 
 
 async def test_invalid_card_rejects_the_whole_batch(api):

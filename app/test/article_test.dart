@@ -3,6 +3,23 @@ import 'package:proclan_app/article.dart';
 import 'package:proclan_app/feed_client.dart';
 
 void main() {
+  test('tilde and longer fences keep chart markers and code intact', () {
+    for (final fence in ['~~~', '````']) {
+      final body = '$fence\n```\n[[chart:0]]\na\nb\n$fence\n[[chart:1]]';
+      final pieces = articlePieces(body);
+      expect(pieces, hasLength(2));
+      expect((pieces.first as ArticleHtml).html, contains('[[chart:0]]'));
+      expect((pieces.first as ArticleHtml).html, isNot(contains('a  \nb')));
+      expect((pieces.last as ArticleChartMark).index, 1);
+      expect(shareBody(body), '$fence\n```\n[[chart:0]]\na\nb\n$fence');
+    }
+  });
+
+  test('an oversized chart index stays text instead of throwing', () {
+    final body = '[[chart:${'9' * 100}]]';
+    expect(articlePieces(body).single, isA<ArticleHtml>());
+  });
+
   test('a chart line splits the body and a fenced line stays text', () {
     final pieces = articlePieces('''
 甲

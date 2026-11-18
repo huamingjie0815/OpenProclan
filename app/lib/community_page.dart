@@ -128,6 +128,10 @@ class _CommunityPageState extends State<CommunityPage> {
           () => _error = accountMessage(AppLocalizations.of(context), error),
         );
       }
+    } catch (_) {
+      if (mounted && epoch == _epoch) {
+        setState(() => _error = AppLocalizations.of(context).offline);
+      }
     } finally {
       if (mounted && epoch == _epoch) {
         setState(() => _busy = false);
@@ -153,6 +157,10 @@ class _CommunityPageState extends State<CommunityPage> {
           () => _error = accountMessage(AppLocalizations.of(context), error),
         );
       }
+    } catch (_) {
+      if (mounted && epoch == _epoch) {
+        setState(() => _error = AppLocalizations.of(context).offline);
+      }
     } finally {
       if (mounted && epoch == _epoch) {
         setState(() => _busy = false);
@@ -172,6 +180,7 @@ class _CommunityPageState extends State<CommunityPage> {
 
   void _clearSearch() {
     _search.clear();
+    _onSearch('');
   }
 
   void _pick(_Section section) {
@@ -206,6 +215,10 @@ class _CommunityPageState extends State<CommunityPage> {
           accountMessage(AppLocalizations.of(context), error),
         );
       }
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).offline);
+      }
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -227,6 +240,10 @@ class _CommunityPageState extends State<CommunityPage> {
           context,
           accountMessage(AppLocalizations.of(context), error),
         );
+      }
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).offline);
       }
     } finally {
       if (mounted) {
@@ -255,6 +272,10 @@ class _CommunityPageState extends State<CommunityPage> {
           accountMessage(AppLocalizations.of(context), error),
         );
       }
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).offline);
+      }
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -271,7 +292,9 @@ class _CommunityPageState extends State<CommunityPage> {
       ownerId: guest.ownerId,
       name: guest.name,
     );
-    if (!mounted || _top?.kind != _Kind.guest) {
+    if (!mounted ||
+        _top?.guest?.ownerId != guest.ownerId ||
+        _top?.guest?.name != guest.name) {
       return;
     }
     final next = [..._stack];
@@ -281,7 +304,7 @@ class _CommunityPageState extends State<CommunityPage> {
 
   Future<void> _toggleFollow() async {
     final guest = _top?.guest;
-    if (guest == null || guest.mine) {
+    if (_busy || guest == null || guest.mine) {
       return;
     }
     final wasFollowing = guest.following;
@@ -296,21 +319,25 @@ class _CommunityPageState extends State<CommunityPage> {
       if (!ok || !mounted) {
         return;
       }
-      await widget.client.unfollow(ownerId: guest.ownerId, name: guest.name);
-    } else if (guest.listed || guest.direct) {
-      await widget.client.follow(ownerId: guest.ownerId, name: guest.name);
-    } else {
+    } else if (!guest.listed && !guest.direct) {
       return;
     }
-    if (!mounted) {
-      return;
-    }
-    final l = AppLocalizations.of(context);
-    showRedNotice(
-      context,
-      wasFollowing ? l.communityUnfollowed : l.communityFollowed,
-    );
-    await _refreshGuest();
+    await _runAction(() async {
+      if (wasFollowing) {
+        await widget.client.unfollow(ownerId: guest.ownerId, name: guest.name);
+      } else {
+        await widget.client.follow(ownerId: guest.ownerId, name: guest.name);
+      }
+      if (!mounted) {
+        return;
+      }
+      final l = AppLocalizations.of(context);
+      showRedNotice(
+        context,
+        wasFollowing ? l.communityUnfollowed : l.communityFollowed,
+      );
+      await _refreshGuest();
+    });
   }
 
   Future<void> _vote(int vote) async {
@@ -319,12 +346,39 @@ class _CommunityPageState extends State<CommunityPage> {
       return;
     }
     final next = guest.vote == vote ? 0 : vote;
-    await widget.client.vote(
-      ownerId: guest.ownerId,
-      name: guest.name,
-      vote: next,
-    );
-    await _refreshGuest();
+    await _runAction(() async {
+      await widget.client.vote(
+        ownerId: guest.ownerId,
+        name: guest.name,
+        vote: next,
+      );
+      await _refreshGuest();
+    });
+  }
+
+  Future<void> _runAction(Future<void> Function() action) async {
+    if (_busy) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await action();
+    } on AccountException catch (error) {
+      if (mounted) {
+        showRedNotice(
+          context,
+          accountMessage(AppLocalizations.of(context), error),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).offline);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
   }
 
   Future<void> _copyCode(String code) async {
@@ -551,14 +605,16 @@ class _CommunityPageState extends State<CommunityPage> {
     if (!ok || !mounted) {
       return;
     }
-    await widget.client.unfollow(ownerId: copies.ownerId, name: copies.name);
-    if (!mounted || _top?.kind != _Kind.copies) {
-      return;
-    }
-    final next = [..._stack];
-    next[next.length - 1] = _Place.copies(copies, following: false);
-    setState(() => _stack = next);
-    showRedNotice(context, l.communityUnfollowed);
+    await _runAction(() async {
+      await widget.client.unfollow(ownerId: copies.ownerId, name: copies.name);
+      if (!mounted || _top != place) {
+        return;
+      }
+      final next = [..._stack];
+      next[next.length - 1] = _Place.copies(copies, following: false);
+      setState(() => _stack = next);
+      showRedNotice(context, l.communityUnfollowed);
+    });
   }
 }
 
@@ -1520,13 +1576,11 @@ class _Action extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
-    this.selected = false,
     this.danger = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
-  final bool selected;
   final bool danger;
 
   @override
@@ -1536,24 +1590,18 @@ class _Action extends StatelessWidget {
         ? Red.muted
         : danger
         ? Red.dangerFg
-        : selected
-        ? Red.accentOn
         : Red.fg2;
     final side = !enabled
         ? Red.borderSoft
         : danger
         ? Red.dangerLine
-        : selected
-        ? Red.accent
         : Red.border;
     return Expanded(
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: foreground,
-          backgroundColor: selected && enabled
-              ? Red.accent
-              : Colors.transparent,
+          backgroundColor: Colors.transparent,
           disabledForegroundColor: Red.muted,
           side: BorderSide(color: side),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),

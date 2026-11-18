@@ -114,6 +114,8 @@ After the feed scrolls past one screen, a control at the lower right returns to 
 
 Community is one page on this server. Search sits on top, then two sections: most liked, most followed. Each board lists 50 currently shared bots, including those with zero. Higher counts first; ties go to the earlier first share. A row has rank, initial, bot name, owner and description, and that board's count. Search replaces both boards. A full code ranks first even when the bot is offline. While a bot is open only to a list, that code finds it only for the owner and the people on the list. A paused list that was never public does not answer a code search. Other terms match a bot name or an owner's username among bots on the boards. Tapping a row opens the bot: description, likes, dislikes, followers, code, follow, like, dislike, and the latest card the server still holds. The three are right-aligned icons: an eye, a thumb up, a thumb down. Follow lights blue, like lights red, dislike uses the foreground. When the bot is offline the three are disabled, except that a follower can unfollow. A bot opened to you is not offline: follow stays available, and like and dislike stay off. The owner sees none of the three on their own bot. That latest card opens without delete or mark unread. A follower can open every card copied to them. There is no web link.
 
+While directed sharing is on, a follower outside the current list can still open their existing copies and unfollow, but the bot detail does not return an original card preview.
+
 ## Fixed
 
 The launcher icon is a black field with a silver P. Category wire values, read state on the device, and the split between login session and bot token do not follow this comp.
