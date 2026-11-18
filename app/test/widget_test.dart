@@ -1,9 +1,11 @@
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:proclan_app/account_api.dart';
@@ -49,17 +51,22 @@ class FakeFeedClient implements FeedClient {
   }
 }
 
+Finder _body(String text) => find.text(text, findRichText: true);
+
+Finder _bodyHas(Pattern pattern) =>
+    find.textContaining(pattern, findRichText: true);
+
 TextStyle? _styleOf(WidgetTester tester, String snippet) {
   TextStyle? style;
-  void walk(InlineSpan span) {
+  void walk(InlineSpan span, TextStyle? inherited) {
     if (span is! TextSpan) {
       return;
     }
+    final current = inherited?.merge(span.style) ?? span.style;
     final text = span.text;
     if (text != null && text.contains(snippet)) {
-      final next = span.style;
-      if (next?.fontSize != null || style == null) {
-        style = next;
+      if (current?.fontSize != null || style == null) {
+        style = current;
       }
     }
     final children = span.children;
@@ -67,16 +74,19 @@ TextStyle? _styleOf(WidgetTester tester, String snippet) {
       return;
     }
     for (final child in children) {
-      walk(child);
+      walk(child, current);
     }
   }
 
+  for (final widget in tester.widgetList<RichText>(find.byType(RichText))) {
+    walk(widget.text, null);
+  }
   for (final widget in tester.widgetList<SelectableText>(
     find.byType(SelectableText),
   )) {
     final span = widget.textSpan;
     if (span != null) {
-      walk(span);
+      walk(span, null);
     }
   }
   return style;
@@ -89,6 +99,8 @@ FeedCard _card({
   List<String> images = const [],
   String body = '正文',
   String? createdAt,
+  List<CardChart> charts = const [],
+  List<String> videoUrls = const [],
 }) {
   return FeedCard(
     id: id,
@@ -103,6 +115,8 @@ FeedCard _card({
     createdBot: '北风',
     read: false,
     createdAt: createdAt ?? DateTime.now().toIso8601String(),
+    charts: charts,
+    videoUrls: videoUrls,
   );
 }
 
@@ -215,7 +229,7 @@ void main() {
 
     await tester.tap(find.text('汇率波动'));
     await tester.pumpAndSettle();
-    expect(find.text('美元走弱'), findsOneWidget);
+    expect(_body('美元走弱'), findsOneWidget);
     expect(find.text('财经'), findsNothing);
 
     await tester.ensureVisible(find.text('删除卡片'));
@@ -280,7 +294,7 @@ void main() {
       );
       expect(
         tester.getTopLeft(find.text('摘要')).dy,
-        lessThan(tester.getTopLeft(find.text('正文')).dy),
+        lessThan(tester.getTopLeft(_body('正文')).dy),
       );
     },
   );
@@ -348,6 +362,8 @@ void main() {
 
 - 第一
 - 第二
+
+<script>alert(1)</script>
 ''',
       ),
     ]);
@@ -361,20 +377,146 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('小节'), findsOneWidget);
-    expect(find.textContaining('普通段\n换行仍在。'), findsOneWidget);
-    expect(find.textContaining('重点'), findsOneWidget);
-    expect(find.textContaining('这篇报道'), findsOneWidget);
-    expect(find.textContaining('第一'), findsOneWidget);
-    expect(find.textContaining('第二'), findsOneWidget);
-    expect(find.textContaining('**'), findsNothing);
-    expect(find.textContaining('##'), findsNothing);
+    expect(_body('小节'), findsOneWidget);
+    expect(_bodyHas('普通段'), findsOneWidget);
+    expect(_bodyHas('换行仍在。'), findsOneWidget);
+    expect(_bodyHas('重点'), findsOneWidget);
+    expect(_bodyHas('这篇报道'), findsOneWidget);
+    expect(_bodyHas('第一'), findsOneWidget);
+    expect(_bodyHas('第二'), findsOneWidget);
+    expect(_bodyHas('alert(1)'), findsOneWidget);
+    expect(_bodyHas('**'), findsNothing);
+    expect(_bodyHas('##'), findsNothing);
     expect(_styleOf(tester, '小节')?.fontSize, 22);
     expect(_styleOf(tester, '小节')?.fontWeight, FontWeight.w500);
     expect(_styleOf(tester, '普通段')?.fontFamily, 'PingFang SC');
     expect(_styleOf(tester, '普通段')?.fontSize, 17);
     expect(_styleOf(tester, '普通段')?.color, Red.fg2);
     expect(_styleOf(tester, '重点')?.fontWeight, FontWeight.w600);
+  });
+
+  testWidgets('detail places a chart and keeps a fenced marker as text', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(900, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final client = FakeFeedClient([
+      _card(
+        id: 'chart',
+        title: '图',
+        category: '科技',
+        body: '''
+开头
+
+[[chart:0]]
+
+[[chart:0]]
+
+```
+[[chart:1]]
+```
+
+[[chart:9]]
+
+结尾
+''',
+        charts: const [
+          CardChart(
+            type: 'bar',
+            title: '柱状',
+            labels: ['甲', '乙'],
+            series: [
+              CardPoint(name: '产量', data: [1.0, 2.0]),
+            ],
+          ),
+          CardChart(
+            type: 'line',
+            title: '围栏',
+            labels: ['丙', '丁'],
+            series: [
+              CardPoint(name: '走势', data: [2.0, 1.0]),
+            ],
+          ),
+          CardChart(
+            type: 'pie',
+            title: '饼图',
+            labels: ['春', '夏'],
+            series: [
+              CardPoint(name: '份额', data: [3.0, 1.0]),
+            ],
+          ),
+        ],
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: DetailPage(card: client.cards.first, client: client),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('柱状'), findsOneWidget);
+    expect(find.text('产量'), findsOneWidget);
+    expect(_bodyHas('[[chart:1]]'), findsOneWidget);
+    expect(_bodyHas('[[chart:9]]'), findsNothing);
+    expect(_bodyHas('[[chart:0]]'), findsNothing);
+    expect(find.byType(BarChart), findsOneWidget);
+    expect(find.byType(LineChart), findsOneWidget);
+    expect(find.byType(PieChart), findsOneWidget);
+    expect(
+      tester.getTopLeft(_body('开头')).dy,
+      lessThan(tester.getTopLeft(find.text('柱状')).dy),
+    );
+    expect(
+      tester.getTopLeft(find.text('柱状')).dy,
+      lessThan(tester.getTopLeft(_body('结尾')).dy),
+    );
+    expect(
+      tester.getTopLeft(_body('结尾')).dy,
+      lessThan(tester.getTopLeft(find.text('围栏')).dy),
+    );
+    expect(
+      tester.getTopLeft(find.text('围栏')).dy,
+      lessThan(tester.getTopLeft(find.text('饼图')).dy),
+    );
+  });
+
+  testWidgets('a direct video shows a play control and a page stays a link', (
+    tester,
+  ) async {
+    final client = FakeFeedClient([
+      _card(
+        id: 'video',
+        title: '片',
+        category: '科技',
+        videoUrls: const [
+          'https://1.1.1.1/clip.mp4?token=1',
+          'https://www.youtube.com/watch?v=abc',
+        ],
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: DetailPage(card: client.cards.first, client: client),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('article-video-0')), findsOneWidget);
+    expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+    expect(find.byType(VideoPlayer), findsNothing);
+    expect(find.byKey(const ValueKey('article-video-link-1')), findsOneWidget);
+    expect(find.textContaining('youtube.com'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('article-video-0'))).dy,
+      lessThan(tester.getTopLeft(find.text('片')).dy),
+    );
   });
 
   testWidgets('opening a card marks it read', (tester) async {
@@ -676,7 +818,10 @@ void main() {
     await tester.tap(find.byKey(const Key('open-menu')));
     await tester.pumpAndSettle();
 
-    expect(tester.widget<Text>(find.byKey(const Key('drawer-avatar'))).data, '林');
+    expect(
+      tester.widget<Text>(find.byKey(const Key('drawer-avatar'))).data,
+      '林',
+    );
   });
 
   testWidgets('bots page copies an mcp setup prompt', (tester) async {
@@ -830,7 +975,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('bot-card-c1')));
     await tester.pumpAndSettle();
-    expect(find.text('正文'), findsOneWidget);
+    expect(_body('正文'), findsOneWidget);
     expect(
       tester.widget<IconButton>(find.byKey(const Key('detail-back'))).tooltip,
       '返回',
@@ -842,7 +987,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('detail-back')));
     await tester.pumpAndSettle();
-    expect(find.text('正文'), findsNothing);
+    expect(_body('正文'), findsNothing);
     expect(find.text('汇率波动'), findsOneWidget);
     expect(find.text('编辑资料'), findsNothing);
 
@@ -850,10 +995,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bot-card-c2')));
     await tester.pumpAndSettle();
-    expect(find.text('另一篇'), findsOneWidget);
+    expect(_body('另一篇'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('另一篇'), findsNothing);
+    expect(_body('另一篇'), findsNothing);
     expect(find.text('模型降价'), findsOneWidget);
     expect(find.text('编辑资料'), findsNothing);
 

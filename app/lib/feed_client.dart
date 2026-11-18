@@ -2,6 +2,97 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+class CardPoint {
+  const CardPoint({required this.name, required this.data});
+
+  final String name;
+  final List<double> data;
+
+  Map<String, dynamic> toJson() => {'name': name, 'data': data};
+}
+
+class CardChart {
+  const CardChart({
+    required this.type,
+    required this.title,
+    required this.labels,
+    required this.series,
+  });
+
+  final String type;
+  final String title;
+  final List<String> labels;
+  final List<CardPoint> series;
+
+  static CardChart? tryParse(Object? raw) {
+    if (raw is! Map) {
+      return null;
+    }
+    final type = raw['type'];
+    if (type != 'bar' && type != 'line' && type != 'pie') {
+      return null;
+    }
+    final labelsRaw = raw['labels'];
+    if (labelsRaw is! List || labelsRaw.isEmpty) {
+      return null;
+    }
+    final labels = <String>[];
+    for (final label in labelsRaw) {
+      if (label is! String || label.isEmpty) {
+        return null;
+      }
+      labels.add(label);
+    }
+    final seriesRaw = raw['series'];
+    if (seriesRaw is! List || seriesRaw.isEmpty) {
+      return null;
+    }
+    if (type == 'pie' && seriesRaw.length != 1) {
+      return null;
+    }
+    final series = <CardPoint>[];
+    for (final item in seriesRaw) {
+      if (item is! Map) {
+        return null;
+      }
+      final dataRaw = item['data'];
+      if (dataRaw is! List || dataRaw.length != labels.length) {
+        return null;
+      }
+      final data = <double>[];
+      for (final value in dataRaw) {
+        if (value is! num || !value.isFinite) {
+          return null;
+        }
+        data.add(value.toDouble());
+      }
+      final name = item['name'];
+      series.add(CardPoint(name: name is String ? name : '', data: data));
+    }
+    final title = raw['title'];
+    return CardChart(
+      type: type,
+      title: title is String ? title : '',
+      labels: labels,
+      series: series,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'type': type,
+    'title': title,
+    'labels': labels,
+    'series': [for (final item in series) item.toJson()],
+  };
+}
+
+List<CardChart> parseCharts(Object? raw) {
+  if (raw is! List) {
+    return const [];
+  }
+  return [for (final item in raw) ?CardChart.tryParse(item)];
+}
+
 class FeedCard {
   const FeedCard({
     required this.id,
@@ -17,6 +108,8 @@ class FeedCard {
     required this.read,
     required this.createdAt,
     this.sourceUsername = '',
+    this.charts = const [],
+    this.videoUrls = const [],
   });
 
   final String id;
@@ -38,6 +131,8 @@ class FeedCard {
 
   /// Owner of a copied card, or of a community preview. Empty for your own cards.
   final String sourceUsername;
+  final List<CardChart> charts;
+  final List<String> videoUrls;
 
   factory FeedCard.fromJson(Map<String, dynamic> json) {
     return FeedCard(
@@ -55,6 +150,8 @@ class FeedCard {
       read: json['read'] as bool? ?? false,
       createdAt: json['created_at'] as String? ?? '',
       sourceUsername: json['source_username'] as String? ?? '',
+      charts: parseCharts(json['charts']),
+      videoUrls: (json['video_urls'] as List<dynamic>? ?? const []).cast<String>(),
     );
   }
 
@@ -72,6 +169,8 @@ class FeedCard {
       'created_bot': createdBot,
       'created_at': createdAt,
       'source_username': sourceUsername,
+      'charts': [for (final chart in charts) chart.toJson()],
+      'video_urls': videoUrls,
     };
   }
 }
