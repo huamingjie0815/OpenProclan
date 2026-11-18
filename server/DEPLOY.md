@@ -1,38 +1,65 @@
 English | [中文](DEPLOY.zh.md)
 
-# Deploy Proclan
+# Deploy the Proclan server (a runbook for an agent)
 
-Deploy the Proclan server on a Linux machine the person owns, with an HTTPS reverse proxy in front. Do not install it on an agent's cloud computer. The server does not issue certificates and does not serve TLS itself.
+Install the Proclan server on a Linux machine the developer owns, with an HTTPS reverse proxy in front. This is the only install and upgrade procedure; [../README.md](../README.md) is only an index. Do not copy these commands into other docs, and do not install this service on an agent's cloud computer.
 
-There is no global ingest token. The feed and delete use the session from login. An image already stored under `/media` uses that session too. `/mcp` uses that person's own bot token, copied from the app. The two credentials are not interchangeable: the session token is for the feed and those stored images; the bot token is for MCP.
+Three sentences save most of the rework:
 
-This is the only install procedure. [../README.md](../README.md) is the index for an AI agent. Do not copy these commands into another doc.
+1. Decide first whether this machine is a **first install** or an **existing install**. Taking the wrong branch overwrites someone's data.
+2. Every phase states the evidence that passes. If the evidence does not match, stop and read the failure note instead of stacking the next step on top.
+3. There is exactly one dataset: the database plus `media/`. Ask a person before any action that deletes data.
 
-## Prepare
+There is no global ingest token. The feed and deletes use the login session. Images already stored under `/media` also use it. `/mcp` uses that person's bot token, copied from the app. The two are not interchangeable.
 
-Minimum to start server installation:
+## 0. Decide what you are doing
 
-- A Linux server the person owns, with root access and a public address.
-- A domain that already resolves to that machine.
-- Caddy or Nginx. For Nginx, also the certificate file paths.
+| Situation | How to tell | Go to |
+| --- | --- | --- |
+| Never installed here | `test -d /opt/proclan` is false and `systemctl cat proclan` says not found | Section 2, first install |
+| Installed, update the code | `/opt/proclan/.git` exists and `systemctl is-active proclan` is active | Section 3, upgrade |
+| Installed but not running | As above, but `systemctl status` is not active | Section 5 first, then talk about upgrading |
+| Rebuilding on a new machine | New machine, old one still alive | Section 2, then move data with Section 4 |
+| Only a config change | One line in `.env` | Section 2.4, restart, then Section 2.7 |
 
-Flutter / app packaging can be deferred. If the agent cannot reach the Flutter machine now, install the server first, report the https origin to the person, and leave `API_BASE` for them to set later.
+Record the scene before touching anything:
 
-Open 80 and 443 only. Leave `8787` on the loopback interface for the proxy.
+```bash
+uname -a
+id -u
+sudo -n true && echo "sudo-ok"
+df -h /opt
+```
 
-## Install
+If `id -u` is not 0 and `sudo -n` fails, settle permissions first. Never ask for a root password in chat and never put one on a command line.
 
-Use `/opt/proclan`.
+## 1. What a person must provide first
 
-### Clone
+If one item is missing, stop. Do not guess, and do not substitute a tunnel or a private address.
+
+| Need | Why | If missing |
+| --- | --- | --- |
+| A Linux server the developer owns, with root or sudo | `/opt/proclan` and systemd need it | Stop and ask |
+| A domain that already resolves here | The app and MCP both need an HTTPS origin | Stop and ask; do not use a bare IP |
+| Caddy or Nginx | The service listens locally and issues no certificate | Stop and ask which; Nginx also needs certificate paths |
+| A bot token | Verifying `/mcp` | The person copies it from the app's bot page; do not generate one |
+
+Can defer: the machine that runs the Flutter app. The app is not installed on the server. If that machine is unreachable now, hand over the https origin and leave `API_BASE` for later.
+
+## 2. First install
+
+The directory is always `/opt/proclan`. Each phase gives a command and the evidence that passes. If the evidence does not match, read the failure note.
+
+### 2.1 Clone
 
 ```bash
 git clone https://github.com/huamingjie0815/OpenProclan.git /opt/proclan
 ```
 
-If the clone fails (private repo, 404, network error), stop and ask how this machine should reach the repository. The usual fix for a private repo is SSH: `git clone git@github.com:huamingjie0815/OpenProclan.git /opt/proclan`. Do not invent another URL.
+- Passes: `/opt/proclan/.git` exists and `git -C /opt/proclan log -1 --oneline` prints a commit.
+- Fails: on a private repo, 404, or a network error, stop and ask how this machine should reach the repository. A private repo usually means SSH: `git@github.com:huamingjie0815/OpenProclan.git`. Do not invent a URL.
 
-### Dependencies
+### 2.2 Dependencies
 
 ```bash
 cd /opt/proclan/server
@@ -42,73 +69,50 @@ uv sync --frozen --no-dev
 cp .env.example .env
 ```
 
-`uv sync` installs dependencies into `server/.venv` and prepares Python 3.12 from `server/.python-version`. Do not commit `.venv`.
-
-If `uv sync --frozen --no-dev` stalls (slow or blocked PyPI access), one fallback is to export and install with pip:
+- Passes: `/opt/proclan/server/.venv/bin/python -V` prints Python 3.12.x.
+- `uv sync` installs into `server/.venv` and prepares Python 3.12 from `server/.python-version`. Do not commit `.venv`.
+- Fails: if `uv sync` stalls because PyPI is slow or blocked, export and install:
 
 ```bash
 uv export --frozen --no-dev > requirements.txt
 .venv/bin/pip install -r requirements.txt
 ```
 
-### Check port
-
-The default listen port is `8787`. Check if it is already in use:
+### 2.3 Check the port
 
 ```bash
 ss -tlnp | grep :8787
 ```
 
-If another process holds `8787`, choose a different port. Set `PORT` in `server/.env` and point the reverse proxy at that same port.
+- Passes: no output, so the port is free.
+- Occupied: choose another port, set `PORT` in `server/.env`, and point the proxy at the same port. Do not kill a process you do not recognize.
 
-### .env
+### 2.4 Write .env
 
-`server/.env` holds the listen address. The process reads that file on startup. A variable that is already in the environment wins.
-
-Required:
+`server/.env` holds the listen address and the optional settings. The process reads it at start, and a variable already in the environment wins.
 
 ```bash
 HOST=127.0.0.1
 PORT=8787
 ```
 
-With `HOST=127.0.0.1`, only a proxy on this machine can reach the server.
+With `HOST=127.0.0.1`, only a proxy on this machine can connect. That is the default and the requirement.
 
-Optional variables:
-
-| Variable | Role |
+| Variable | Effect |
 | --- | --- |
-| `BOT_MESSAGE_TTL_HOURS` | Hours the server keeps each message. Default `24`. Values below 1 become 1 |
-| `PROCLAN_DATA_DIR` | Database and image directory. Default `server/data`. Use an absolute path |
-| `FORWARDED_ALLOW_IPS` | Proxy addresses allowed to rewrite the scheme. Default `127.0.0.1,::1` |
+| `BOT_MESSAGE_TTL_HOURS` | How many hours a card stays on the wall. Default `24`, below 1 becomes 1. This is product behavior, not a cleanup job |
+| `PROCLAN_DATA_DIR` | Database and image directory, default `server/data`. Use an absolute path |
+| `FORWARDED_ALLOW_IPS` | Proxy addresses allowed to rewrite the scheme, default `127.0.0.1,::1` |
+| `PROCLAN_WORKERS` | Worker count, default `2`. Do not set `WEB_CONCURRENCY` |
+| `PROCLAN_BOT_BURST`, `PROCLAN_BOT_REFILL_SECONDS` | Per-bot write quota, default `48` cards then 1 every `2` seconds |
 
-**Troubleshooting image URLs**: Images already stored on disk are served from `/media`. If those URLs look like `http://127.0.0.1:8787/media/...` instead of `https://<domain>/media/...`, the proxy is not setting `Host` and `X-Forwarded-Proto` correctly, or its address is not in `FORWARDED_ALLOW_IPS`. Fix the proxy headers or add its address to `FORWARDED_ALLOW_IPS`. A new card's images are the submitted URLs and do not use these headers.
+`.env` changes need a restart. Never commit it and never put it in a backup bundle.
 
-### Data directory
+### 2.5 Reverse proxy and HTTPS
 
-Data lives in `PROCLAN_DATA_DIR`:
+The proxy must pass the original host in `Host`, set `X-Forwarded-Proto` to `https`, and forward `X-Forwarded-For`. Open only 80 and 443. Leave `8787` on the machine.
 
-- `proclan.sqlite3` holds the cards
-- `media/` holds image files that older cards still reference
-
-New cards store the submitted URL and do not add files. The directory shrinks as those cards expire or are deleted. Do not delete a file that a card still uses, or that picture disappears.
-
-## Accounts
-
-The app registers and signs in with a username and a password. Reset a forgotten password on this server:
-
-```bash
-cd /opt/proclan/server
-uv run python -m proclan_server.set_password <username> <new-password>
-```
-
-ASCII case is ignored in the lookup. The command stores an argon2id hash, deletes that user's sessions, and does not rotate the bot token. It exits non-zero when the username does not exist. The account rules are in [../AGENTS.md](../AGENTS.md).
-
-## HTTPS
-
-When the proxy and this server are on the same machine, leave `FORWARDED_ALLOW_IPS` at its default. The proxy must put the original host in `Host` and set `X-Forwarded-Proto` to `https`. The server builds `/media` URLs for image files already on disk from those two values. If the proxy is not trusted, or omits either value, those URLs become `http://127.0.0.1:8787/media/...` and the app on a phone cannot open them. A new card's images are the submitted URLs and do not use these headers.
-
-### Caddy
+Caddy:
 
 ```caddy
 proclan.example.com {
@@ -116,11 +120,7 @@ proclan.example.com {
 }
 ```
 
-Replace `proclan.example.com` with the person's domain. Caddy obtains the certificate and forwards to `8787` on this machine.
-
-### Nginx
-
-Replace the certificate paths with the person's files.
+Nginx (swap in the real certificate paths):
 
 ```nginx
 server {
@@ -129,39 +129,6 @@ server {
 
     ssl_certificate     /etc/ssl/proclan.example.com/fullchain.pem;
     ssl_certificate_key /etc/ssl/proclan.example.com/privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:8787;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
-
-When the proxy is not on `127.0.0.1`, set `FORWARDED_ALLOW_IPS` to that proxy's address. Do not set it to `*`. Any client could then rewrite the scheme.
-
-### Nginx with static landing page
-
-Some setups serve a static ICP or landing page at `/` while proxying the API. Use `location = /` for an exact match:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name proclan.example.com;
-
-    ssl_certificate     /etc/ssl/proclan.example.com/fullchain.pem;
-    ssl_certificate_key /etc/ssl/proclan.example.com/privkey.pem;
-
-    location = / {
-        root /var/www/landing;
-        try_files /index.html =404;
-    }
-
-    location = /index.html {
-        root /var/www/landing;
-    }
 
     location / {
         proxy_pass http://127.0.0.1:8787;
@@ -174,23 +141,33 @@ server {
 }
 ```
 
-The exact-match `location = /` serves the landing page. All other paths go to the app.
+When the proxy is not on `127.0.0.1`, set `FORWARDED_ALLOW_IPS` to that address. Never `*`.
 
-## Workers
+Some installs keep a static filing or landing page at `/` and proxy everything else:
 
-The server runs two worker processes by default. Set `PROCLAN_WORKERS` to change that. Do not set `WEB_CONCURRENCY`. The database stays one `proclan.sqlite3` file in WAL mode. A write takes one short immediate transaction. A write that is still waiting after 5 seconds returns 429 `retry later`.
+```nginx
+    location = / {
+        root /var/www/landing;
+        try_files /index.html =404;
+    }
 
-Each bot can land 48 cards at once, then one more card every 2 seconds. `PROCLAN_BOT_BURST` and `PROCLAN_BOT_REFILL_SECONDS` change those numbers. The `submit_cards` description shows the numbers in use. A bot over that limit gets 429 `retry later`. A request body over 1 MiB gets 413 `payload too large`.
+    location = /index.html {
+        root /var/www/landing;
+    }
+```
 
-An account keeps at most 32 bot names. It can add 8 new names at once, then one more name every 60 seconds. Adding names faster than that returns 429 `retry later`. At 32 names the tool says to delete an unused name first. The `submit_cards` description shows these numbers too.
+`location = /` matches only the home page; other paths use the `location /` above.
 
-The worker count comes from the environment, not from the unit.
+- Passes: `curl -sS -o /dev/null -w '%{http_code}\n' https://<domain>/openapi.json` prints `200` once the service runs.
+- Fails: certificate not issued, domain not resolving, or the security group blocks 443. See Section 5.
 
-The unit below assumes the clone path above. `HOST` and `PORT` are already in `.env`. Do not put a token in the unit.
+### 2.6 Keep it running
+
+The worker count comes from the environment, not the unit. The unit carries no token.
 
 ```ini
 [Unit]
-Description=Proclan inbox
+Description=Proclan inbox service
 After=network.target
 
 [Service]
@@ -204,81 +181,186 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
-Save it as `/etc/systemd/system/proclan.service`.
+Save it as `/etc/systemd/system/proclan.service`, then:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now proclan
-sudo systemctl status proclan
+sudo systemctl status proclan --no-pager
 ```
 
-On the server, `/openapi.json` is 200. `/v1/categories` without a session is 401.
+- Passes: `active (running)`, and `journalctl -u proclan -n 50` shows `Uvicorn running on http://127.0.0.1:<PORT>` with no traceback.
+- The database and its tables are created on first start. There is no separate migration command.
+
+### 2.7 Verify
+
+Three checks on the machine:
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/openapi.json
-curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/v1/categories
+curl -sS -o /dev/null -w 'openapi %{http_code}\n' http://127.0.0.1:8787/openapi.json
+curl -sS -o /dev/null -w 'categories %{http_code}\n' http://127.0.0.1:8787/v1/categories
+curl -sS -o /dev/null -w 'feed %{http_code}\n' http://127.0.0.1:8787/v1/feed
 ```
 
-## Check from outside
+Expect `openapi 200`, `categories 401`, `feed 401`. A 401 means the route exists and wants a login, which is success; a 404 here means the wrong build or the wrong port.
 
-Replace the domain.
+Two checks from outside, with the real domain:
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' https://proclan.example.com/openapi.json
-curl -sS -o /dev/null -w '%{http_code}\n' https://proclan.example.com/v1/categories
+curl -sS -o /dev/null -w 'public-openapi %{http_code}\n' https://<domain>/openapi.json
+curl -sS -o /dev/null -w 'public-categories %{http_code}\n' https://<domain>/v1/categories
 ```
 
-If the public curl fails but loopback `/openapi.json` returns 200 and the proxy config is correct, report that to the person. DNS propagation, ICP filing, or upstream firewall may still block the public edge. Do not loop forever waiting for external access.
+Expect `200` and `401`.
 
-### MCP check
-
-The MCP URL is `https://proclan.example.com/mcp`. It is stateless Streamable HTTP. The result is one JSON body. There is no separate SSE endpoint.
-
-The request needs that person's bot token. Copy the token from the app's bot page, or from the `bot_token` field in the `POST /v1/auth/register` response when registering. If you do not have a bot token, stop. Do not generate one.
+One MCP check. It needs that person's bot token, copied from the app's bot page or taken from the `bot_token` field of the register response:
 
 ```bash
-curl -sS https://proclan.example.com/mcp \
-  -H "Authorization: Bearer <the person's bot token>" \
+curl -sS https://<domain>/mcp \
+  -H "Authorization: Bearer <bot token>" \
   -H "Accept: application/json, text/event-stream" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"deploy-check","version":"0"}}}'
 ```
 
-A returned `protocolVersion` is enough.
+- Passes: the body contains `protocolVersion`.
+- 401: the token is wrong, or a session token was used instead of the bot token. Do not change the server to accommodate it.
+- After it connects, list the tools. The only tool must be `submit_cards`.
 
-When writing cards, list the tools and read the live `submit_cards` inputSchema. Do not copy a field table into a prompt. The server does not rewrite the title, summary, body, source, or category.
+If the public curl fails while loopback returns 200 and the proxy config is right, report that. DNS, ICP filing, the security group, or an upstream firewall may still block the edge. Do not loop forever.
 
-## App
+## The app (on another machine)
 
-On the computer that runs the app, set `API_BASE` to this https origin and follow [../app/README.md](../app/README.md). Do not compile the app on the server. Do not write the origin into source.
+After the server is up, the app is not built on this machine. Hand over the https origin and have the machine with Flutter set `API_BASE` to it; everything else is in [../app/README.md](../app/README.md). Do not install Flutter on the server to produce a build.
 
-The feed and delete send the login session, not the bot token. An image already stored under `/media` sends that session too. A new card's images are the submitted http(s) URLs, and those requests do not send the session.
+The feed and deletes use the login session, not the bot token; images already stored under `/media` use it too. New cards point at submitted http(s) URLs, and those requests carry no session.
 
-## MCP connection
+## 3. Upgrade an existing install
 
-Add a remote HTTPS MCP:
-
-- **Name**: `Proclan`
-- **URL**: `https://<domain>/mcp`
-- **Auth**: Static header only. Name `Authorization`, value `Bearer <bot token>`. Not OAuth.
-
-The bot token comes from the app's bot page or from the `bot_token` field in the register response. The session token is for the feed; the bot token is for MCP. The two are not interchangeable.
-
-**This server does not support OAuth.** If a connector forces OAuth or "re-login", it will fail. If an existing connector is broken, remove it and recreate with the static header auth type.
-
-After connection, call `tools/list`. The only tool must be `submit_cards`. If it fails, run the MCP check above again. Always read the live `inputSchema` before calling `submit_cards`; do not copy field tables into prompts.
-
-## Update and backup
+### 3.1 Record the scene
 
 ```bash
 cd /opt/proclan
-git pull
-cd server
-uv sync --frozen --no-dev
+git status --porcelain
+git log -1 --oneline
+sudo systemctl is-active proclan
+```
+
+- The worktree must be clean. If it is not, find out who changed it; never overwrite.
+- Keep the current commit. A rollback needs it.
+
+Record the data counts. Copy through SQLite rather than `cp` a database that is being written:
+
+```bash
+/opt/proclan/server/.venv/bin/python - <<'EOF'
+import sqlite3
+src = sqlite3.connect('/opt/proclan/server/data/proclan.sqlite3')
+dst = sqlite3.connect('/tmp/proclan-check.sqlite3')
+src.backup(dst)
+q = lambda s: dst.execute(s).fetchone()[0]
+print('cards', q('select count(*) from cards'))
+print('users', q('select count(*) from users'))
+print('bots', q("select count(distinct created_bot) from cards"))
+print('tables', sorted(r[0] for r in dst.execute("select name from sqlite_master where type='table'")))
+print('card_cols', [r[1] for r in dst.execute('pragma table_info(cards)')])
+EOF
+```
+
+Swap the path when `PROCLAN_DATA_DIR` is set. The copy lives in `/tmp`: it holds password hashes and bot tokens, so delete it after use.
+
+### 3.2 Fast-forward main
+
+```bash
+cd /opt/proclan
+git fetch origin main
+git log --oneline HEAD..origin/main
+git merge --ff-only origin/main
+git log -1 --oneline
+git status --porcelain
+```
+
+- Fast-forward only. Never rebase, reset, or force-push a production checkout.
+- Passes: `HEAD` equals `origin/main` and `git status` is empty.
+- Fails: "not possible to fast-forward" means local commits exist. Stop and ask; do not reset.
+
+### 3.3 Dependencies
+
+Reinstall only if these two files changed:
+
+```bash
+git diff --name-only <commit before> HEAD -- server/pyproject.toml server/uv.lock
+```
+
+- Output means run `cd /opt/proclan/server && uv sync --frozen --no-dev`.
+- No output means skip it. Do not reinstall anyway.
+- Never rewrite `server/.env` during an upgrade. If config must change, raise it separately and back it up first.
+
+### 3.4 Rebuild and restart
+
+The new version adds tables and columns on start: `store.init` runs `CREATE TABLE IF NOT EXISTS` plus conditional `ALTER TABLE` every time. Do not hand-run `ALTER` on the database and do not look for a migration script. The repository has none and needs none.
+
+```bash
+sudo systemctl restart proclan
+sleep 3
+sudo systemctl status proclan --no-pager
+sudo journalctl -u proclan -n 100 --no-pager
+```
+
+- Passes: `active (running)`, `Application startup complete` in the log, no traceback. Downtime is usually 1 to 5 seconds.
+- Fails: use Section 5, restore service first, then decide about a rollback.
+
+### 3.5 Verify after the upgrade
+
+```bash
+ss -tlnp | grep :8787
+curl -sS -o /dev/null -w 'openapi %{http_code}\n' http://127.0.0.1:8787/openapi.json
+curl -sS -o /dev/null -w 'feed %{http_code}\n' http://127.0.0.1:8787/v1/feed
+```
+
+Run the count snippet from 3.1 again into a fresh temp file and compare each line:
+
+- Cards, users, and bot names match, so nothing was lost.
+- New tables and new `cards` columns exist.
+- A new route without a session returns 401, not 404.
+
+For extra proof, run the schema logic a second time on the **copy** and confirm it is idempotent (`Store(path).init()` twice without an error). Never experiment on the production database.
+
+### 3.6 Roll back
+
+Code rollback:
+
+```bash
+cd /opt/proclan
+git switch --detach <commit before>
 sudo systemctl restart proclan
 ```
 
-Stop the service before a backup, copy the whole data directory, then start it again:
+A new version only adds tables and columns, and old code ignores them, so a rollback needs no database work. Re-run the 3.5 checks after it. A rollback is a repair, not a request for approval, but the report must say why you rolled back and which commit is live.
+
+After a rollback, HEAD is detached. To return to the main line:
+
+```bash
+cd /opt/proclan
+git switch main
+git merge --ff-only origin/main
+sudo systemctl restart proclan
+```
+
+## 4. Backup and restore
+
+SQLite's own backup API works without stopping the service:
+
+```bash
+sudo mkdir -p /var/backups/proclan
+/opt/proclan/server/.venv/bin/python - <<'EOF'
+import sqlite3
+src = sqlite3.connect('/opt/proclan/server/data/proclan.sqlite3')
+dst = sqlite3.connect('/var/backups/proclan/backup.sqlite3')
+src.backup(dst)
+EOF
+```
+
+Or stop and copy the directory:
 
 ```bash
 sudo systemctl stop proclan
@@ -286,20 +368,69 @@ cp -a /opt/proclan/server/data /var/backups/proclan-data
 sudo systemctl start proclan
 ```
 
-If `PROCLAN_DATA_DIR` was changed, copy that directory. Keep `server/.env` aside. Do not put it in a backup archive that will be shared.
+- With `PROCLAN_DATA_DIR` changed, copy that directory.
+- A backup holds password hashes and bot tokens. Ask before putting one anywhere it can leave the machine.
+- Keep `server/.env` separately and out of the bundle.
+- Restore: stop, replace the data directory with the backup, start, then run the 2.7 checks. This is the reverse of deleting data, so confirm which backup first.
+
+## 5. Failures
+
+| Symptom | Likely cause | Action |
+| --- | --- | --- |
+| Loopback `:8787` refuses the connection | Service down, or `PORT` is not 8787 | `systemctl status`, `journalctl`, `ss -tlnp`; match the port to the proxy |
+| Public 502 or 504 | Proxy points at the wrong port, or the service is down | Prove loopback is 200, then check the proxy upstream |
+| Public times out, loopback 200 | DNS, filing, security group, or upstream firewall | Hand the loopback evidence over; do not change the service |
+| `/openapi.json` is 404 | Request hits another site, or the proxy rewrites the path | Check `server_name` and `location /` |
+| `/media/...` becomes `http://127.0.0.1:8787/...` | Proxy drops `Host`/`X-Forwarded-Proto`, or its address is not trusted | Fix the headers or add the proxy address; never `*` |
+| `/mcp` is 401 | Wrong or rotated token, or a session token was used | Have the person copy the bot token again; do not generate one |
+| `/mcp` is 405 | Probing with GET | Send `initialize` with POST |
+| Images or video do not show | The URL is not http(s), or names a private or loopback host, so it was dropped | Resubmit a public URL; domains are not resolved on the server, by design |
+| Cards suddenly disappear | Older than `BOT_MESSAGE_TTL_HOURS` (24 hours by default) | Product behavior; raise the TTL and restart |
+| 429 `retry later` on a write | Bot or bot-name quota | Wait for the quota; never edit the counters in the database |
+| 413 `payload too large` | Body over 1 MiB | Split the submission |
+| MCP still works after a password change | A password change does not rotate the bot token | To cut it off, `POST /v1/me/bot-token` and paste the new token into the connection |
+| `uv sync` stalls | PyPI slow or blocked | Use the export install in 2.2 |
+| Repeated `database is locked` | A second process writes the same file | Check `ps`/`ss` for a duplicate server, stop the extra one, restart |
+| Service will not start after an upgrade | Dependencies skipped, or a broken `.env` | Read the traceback; install per 3.3, or return to the previous commit |
+
+## 6. Actions that need a person's approval
+
+Do not perform these even when you can, without asking first:
+
+- Deleting or overwriting the data directory, the database, or files under `media/`
+- Replacing current data with a backup
+- Rewriting `server/.env`
+- Changing the domain, the certificate source, or the proxy's site config
+- Opening a new public port, or editing the security group or firewall
+- Editing `sudoers`, the login method, or the SSH configuration
+- Hand-running `ALTER`/`DROP` on the production database, or any self-written migration
+- Moving the service to another machine, or reinstalling the OS
+
+## 7. How to report
+
+Six lines at most. Write "not done" for what you skipped, and do not recap the commands:
+
+1. Site: `https://<domain>`, and whether the app already points at it.
+2. Version: commit before → commit now; whether the worktree is clean.
+3. Data: cards / users / bot names, before → after.
+4. Service: active or not, listen address, seconds of downtime, anything odd in the log.
+5. Checks: loopback and public status codes, whether `/mcp` returned `protocolVersion`.
+6. Open items: whether the client needs a new APK (`./scripts/apk production` on a machine with Flutter).
+
+Keep tokens out of the report. If the person must paste one once, tell them not to forward it.
 
 ---
 
-## Appendix: same-host replace
+## Appendix: replace in place
 
-This section is for replacing an existing install on the same host, not for first-time installs.
+This replaces an existing install on the same machine; it is not a first install. It touches data and config, so confirm before starting.
 
 1. Stop the service: `sudo systemctl stop proclan`
-2. Move the old tree aside: `sudo mv /opt/proclan /opt/proclan.old`
-3. Clone fresh: `git clone https://github.com/huamingjie0815/OpenProclan.git /opt/proclan`
-4. Copy `.env` back: `cp /opt/proclan.old/server/.env /opt/proclan/server/.env`
-5. Restore data if keeping cards: `cp -a /opt/proclan.old/server/data /opt/proclan/server/data`
+2. Move the old directory aside: `sudo mv /opt/proclan /opt/proclan.old`
+3. Clone again: `git clone https://github.com/huamingjie0815/OpenProclan.git /opt/proclan`
+4. Put `.env` back: `cp /opt/proclan.old/server/.env /opt/proclan/server/.env`
+5. To keep cards, restore the data directory: `cp -a /opt/proclan.old/server/data /opt/proclan/server/data`
 6. Reinstall dependencies: `cd /opt/proclan/server && uv sync --frozen --no-dev`
-7. Restart: `sudo systemctl start proclan`
+7. Start and verify: `sudo systemctl start proclan`, then run Section 2.7
 
-If starting with an empty database, all users must register again. The old accounts and bot tokens are gone. MCP connections with old tokens will fail; update them with new tokens after register.
+Starting on an empty database makes every person register again: old accounts and bot tokens are gone, and MCP connections using the old token fail. Prefer the upgrade in Section 3.
