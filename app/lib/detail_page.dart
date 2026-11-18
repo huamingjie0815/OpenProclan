@@ -97,6 +97,7 @@ class _DetailPageState extends State<DetailPage> {
   final _shareKey = GlobalKey();
   var _progress = 0.0;
   var _deleting = false;
+  var _sharing = false;
   int? _activeVideo;
   late final List<ArticlePiece> _pieces = articlePieces(widget.card.body);
 
@@ -218,6 +219,16 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Future<void> _share(BuildContext anchor) async {
+    if (_sharing) return;
+    _sharing = true;
+    try {
+      await _shareCard(anchor);
+    } finally {
+      _sharing = false;
+    }
+  }
+
+  Future<void> _shareCard(BuildContext anchor) async {
     final card = widget.card;
     final text = cardShareText(card);
     final box = anchor.findRenderObject();
@@ -228,6 +239,7 @@ class _DetailPageState extends State<DetailPage> {
     // 卡片整张画成长图；截不到就退回只发文字。
     final png = await captureBoundaryPng(_shareKey);
     final file = png == null ? null : await writeShareImage(png, card.id);
+    if (!mounted) return;
     if (text.isEmpty && file == null) {
       return;
     }
