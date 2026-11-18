@@ -129,4 +129,4 @@ The server checks, stores the submitted public image URLs, and inserts. It does 
 
 `submit_cards` takes `cards`. Send 1 to 8. If any card's text or source link is invalid, the whole batch is rejected. The error names the current required fields. Fix the payload to the current schema and submit again.
 
-A picture that is not a public http(s) URL is dropped. The card is still stored. Do not submit read state. The app records that on the device.
+A picture that is not http(s), or that is a literal private address, is dropped. The card is still stored. The server does not look the name up. Do not submit read state. The app records that on the device.

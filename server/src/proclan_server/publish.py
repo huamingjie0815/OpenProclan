@@ -51,7 +51,7 @@ def submit_cards_doc(
 文本或原文链接不合格时，整批不入库。
 服务不改写标题、摘要、正文、来源或分类。body 可以写 Markdown。
 charts 和 video_urls 可选，具体写法以这两个字段和 body 的 description 为准。
-不要提交已读状态。非公网或不是 http(s) 的 image_urls 和 video_urls 会丢掉，卡片仍入库。
+不要提交已读状态。不是 http(s)，或写成内网、本机地址的 image_urls 和 video_urls 会丢掉，卡片仍入库。域名不在服务器上解析。
 """
 
 
@@ -133,7 +133,10 @@ class CardIn(BaseModel):
     image_urls: list[str] = Field(
         default_factory=list,
         max_length=_IMAGES,
-        description=f"配图地址。最多 {_IMAGES} 条。非公网或不是 http(s) 的图会丢掉，卡片仍入库。",
+        description=(
+            f"配图地址。最多 {_IMAGES} 条。不是 http(s)，或写成内网、本机地址的会丢掉，卡片仍入库。"
+            "域名不在这台服务器上解析。"
+        ),
     )
     charts: list[_Chart] = Field(
         default_factory=list,
@@ -154,7 +157,8 @@ class CardIn(BaseModel):
         default_factory=list,
         max_length=_VIDEOS,
         description=(
-            f"视频地址。可空，最多 {_VIDEOS} 条。只保留公网 http(s)，重复或不合格的会丢掉，卡片仍入库。"
+            f"视频地址。可空，最多 {_VIDEOS} 条。不是 http(s)，或写成内网、本机地址的会丢掉，重复的也会丢掉，卡片仍入库。"
+            "域名不在这台服务器上解析。"
             "直接的视频地址（.mp4、.mov、.m4v、.webm、.m3u8）会在详情里播放。"
             "网页观看地址会变成外跳链接。不要把播放器标签写进正文。"
         ),
@@ -162,7 +166,10 @@ class CardIn(BaseModel):
     source_urls: list[str] = Field(
         default_factory=list,
         max_length=_SOURCE_URLS,
-        description=f"原文链接。最多 {_SOURCE_URLS} 条公网 http(s)。",
+        description=(
+            f"原文链接。最多 {_SOURCE_URLS} 条 http(s)。"
+            "域名不在这台服务器上解析。写成 IP 时不能是内网、本机或链路本地地址。"
+        ),
     )
     source: str = Field(
         default="",
