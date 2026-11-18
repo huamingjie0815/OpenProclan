@@ -10,7 +10,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Personal Daily';
+  String get appTitle => 'My Wall';
 
   @override
   String get weekdayMon => 'Mon';
@@ -57,7 +57,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refreshDone => 'Synced just now';
 
   @override
-  String get offline => 'Can\'t reach the inbox';
+  String get offline => 'Can\'t reach the server';
 
   @override
   String get retry => 'Retry';
@@ -90,7 +90,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get emptyNoneTitle => 'No cards yet';
 
   @override
-  String get emptyNoneBody => 'New stories will appear here.';
+  String get emptyNoneBody => 'Cards your bots post will appear here.';
 
   @override
   String get emptyUnreadTitle => 'Nothing unread left';
@@ -104,7 +104,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get emptyCategoryBody =>
-      'New stories will appear here. Try another category in the meantime.';
+      'Cards your bots post will appear here. Try another category in the meantime.';
 
   @override
   String get showAll => 'Show all';
@@ -115,16 +115,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get groupCountOne => '1 story';
+  String get groupCountOne => '1 card';
 
   @override
   String groupCount(int count) {
-    return '$count stories';
+    return '$count cards';
   }
 
   @override
   String endEdition(int count) {
-    return 'End of edition · $count cards';
+    return '$count cards today';
   }
 
   @override
@@ -225,7 +225,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readProgress => 'Reading progress';
 
   @override
-  String get back => 'Back to feed';
+  String get back => 'Back';
 
   @override
   String get markUnread => 'Mark as unread';
@@ -241,7 +241,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteBody =>
-      'It will disappear from the feed. This cannot be undone.';
+      'It will disappear from your wall. This cannot be undone.';
 
   @override
   String get cancel => 'Cancel';
@@ -262,7 +262,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareFailed => 'Could not open the share sheet.';
 
   @override
-  String get sourceNote => 'Saved to your daily';
+  String get sourceNote => 'Posted to your wall';
 
   @override
   String get openOriginal => 'Open source';
@@ -280,7 +280,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get securitySub => 'Username and password';
 
   @override
-  String get cacheMode => 'Message cache';
+  String get cacheMode => 'Card cache';
 
   @override
   String get cacheNote =>
@@ -389,8 +389,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get botLatest => 'Recent pushes';
 
   @override
-  String get botLatestEmpty =>
-      'No message from this bot is still on the server.';
+  String get botLatestEmpty => 'No card from this bot is still on the server.';
 
   @override
   String get botDelete => 'Delete';
@@ -436,7 +435,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rotateBody =>
-      'The Proclan connection in Grok stops working until you paste the new token into its header.';
+      'Any Proclan connection using it stops working until you paste the new token into its header.';
 
   @override
   String get rotated => 'Token rotated';
@@ -496,7 +495,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get communityUnfollowBody =>
-      'New cards from this bot will stop. Cards you already received stay in your feed.';
+      'New cards from this bot will stop. Cards you already received stay on your wall.';
 
   @override
   String get communityUnfollow => 'Unfollow';
@@ -597,7 +596,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Cards stay on this device. You can sign in again with this account.';
 
   @override
-  String get loginSubtitle => 'Sign in to read your own daily.';
+  String get loginSubtitle => 'Sign in to see your own wall of AI work.';
 
   @override
   String get signIn => 'Log in';
@@ -651,20 +650,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sessionExpired => 'Session expired. Sign in again.';
 
   @override
-  String get authHeadline1 => 'Your feed.';
+  String get authHeadline1 => 'Keep the work.';
 
   @override
-  String get authHeadline2 => 'Your rules.';
+  String get authHeadline2 => 'Keep it yours.';
 
   @override
-  String get authVisualSub =>
-      'Only what you chose. Only what you want to keep.';
+  String get authVisualSub => 'Only your own bots, and the bots you follow.';
 
   @override
-  String get authVisualFoot => 'A daily edition of your own';
+  String get authVisualFoot => 'Your wall of AI work';
 
   @override
-  String get authFoot => 'Your cards belong to you · no recommendation feed';
+  String get authFoot => 'Your cards belong to you · you choose the sources';
 
   @override
   String get loginTitle => 'Welcome back';
@@ -673,11 +671,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get registerTitle => 'Create account';
 
   @override
-  String get registerSub =>
-      'Pick a username and build a daily that belongs only to you.';
+  String get registerSub => 'Pick a username and start a wall of your own.';
 
   @override
-  String get mastheadNote => 'Only what you chose. Only what you want to keep.';
+  String get mastheadNote => 'Only your own bots, and the bots you follow.';
 
   @override
   String get appearance => 'Appearance';

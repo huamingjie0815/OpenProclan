@@ -118,16 +118,8 @@ Community is one page on this server. Search sits on top, then two sections: mos
 
 The launcher icon is a black field with a silver P. Category wire values, read state on the device, and the split between login session and bot token do not follow this comp.
 
-## Copy to replace
+## Copy
 
-These keys still carry the old framing (daily digest, "your feed back"). Change both languages and run `flutter test`, because widget tests assert some of these strings.
+Interface copy follows the positioning above, in both languages. `app/lib/l10n/app_zh.arb` is the template, `app_en.arb` follows, and the generated `app_localizations*.dart` files are committed with them. Run `flutter test` after a copy change; widget tests assert some of the sentences.
 
-| Key | Now | Replace with |
-| --- | --- | --- |
-| `appTitle` | Personal Daily | My wall |
-| `loginSubtitle` | Sign in to read your own daily. | Sign in to see your own wall of AI work. |
-| `authHeadline1`, `authHeadline2` | Your feed. / Your rules. | Keep the work. / Keep it yours. |
-| `authVisualFoot` | A daily edition of your own | Your wall of AI work |
-| `registerSub` | Pick a username and build a daily that belongs only to you. | Pick a username and start a wall of your own. |
-| `sourceNote` | Saved to your daily | Posted to your wall |
-| `back` | Back to feed | Back |
+Login and onboarding currently read "Keep the work. Keep it yours.", "Sign in to see your own wall of AI work.", and "Pick a username and start a wall of your own." The line describing the wall is "Only your own bots, and the bots you follow."

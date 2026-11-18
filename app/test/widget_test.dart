@@ -143,7 +143,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('登录后，只看属于你的日报。'), findsOneWidget);
+    expect(find.text('登录后，看到你自己的 AI 成果墙。'), findsOneWidget);
     expect(find.text('用户名'), findsOneWidget);
     expect(find.text('中文'), findsNothing);
     expect(find.text('English'), findsNothing);
@@ -154,14 +154,14 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('创建账号'));
     await tester.pumpAndSettle();
-    expect(find.text('起一个用户名，建一份只属于你的日报。'), findsOneWidget);
+    expect(find.text('起一个用户名，建一面自己的成果墙。'), findsOneWidget);
     expect(find.text('这是登录名，不能和别人重复，之后可以修改。'), findsOneWidget);
 
     await tester.ensureVisible(find.text('返回登录'));
     await tester.pump();
     await tester.tap(find.text('返回登录'));
     await tester.pumpAndSettle();
-    expect(find.text('登录后，只看属于你的日报。'), findsOneWidget);
+    expect(find.text('登录后，看到你自己的 AI 成果墙。'), findsOneWidget);
     expect(find.text('忘记密码'), findsNothing);
   });
 
@@ -207,7 +207,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('还没有卡片'), findsOneWidget);
-    expect(find.text('有新内容时会出现在这里。'), findsOneWidget);
+    expect(find.text('bot 推来卡片后会出现在这里。'), findsOneWidget);
   });
 
   testWidgets('feed lists every card and detail delete removes one', (
@@ -531,7 +531,7 @@ void main() {
 
     await tester.tap(find.text('模型降价'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('返回信息流'));
+    await tester.tap(find.byTooltip('返回'));
     await tester.pumpAndSettle();
 
     expect(find.text('已读'), findsOneWidget);
@@ -572,7 +572,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('No cards yet'), findsOneWidget);
-    expect(find.text('New stories will appear here.'), findsOneWidget);
+    expect(find.text('Cards your bots post will appear here.'), findsOneWidget);
     expect(find.byTooltip('Open menu'), findsOneWidget);
     expect(find.text('EN'), findsNothing);
     expect(find.text('ALL'), findsNothing);
@@ -697,7 +697,7 @@ void main() {
 
     await tester.tap(find.text('汇率波动'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('返回信息流'));
+    await tester.tap(find.byTooltip('返回'));
     await tester.pumpAndSettle();
 
     await _openSettings(tester);
@@ -958,7 +958,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('首次出现'), findsOneWidget);
     expect(find.text('还没有功能介绍。下次推送时会写上。'), findsOneWidget);
-    expect(find.text('服务端没有这个 bot 还留着的消息。'), findsOneWidget);
+    expect(find.text('服务端没有这个 bot 还留着的卡片。'), findsOneWidget);
     expect(find.text('编辑资料'), findsNothing);
 
     await tester.tap(find.byTooltip('返回'));
