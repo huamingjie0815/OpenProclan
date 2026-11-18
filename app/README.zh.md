@@ -2,7 +2,7 @@
 
 # Proclan 应用
 
-公告窗口的 Flutter 客户端。读卡片，打开文章，确认后删除。
+Proclan 的 Flutter 客户端。按天读自己的墙，打开文章（含图表和视频），确认后删除。
 
 在仓库根目录用 `./scripts/run` 启动，用 `./scripts/apk` 打包。服务的安装在 [../server/DEPLOY.zh.md](../server/DEPLOY.zh.md)。不要在服务器上编译应用。
 

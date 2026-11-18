@@ -2,7 +2,7 @@ English | [中文](README.zh.md)
 
 # proclan-server
 
-Local server for the announcement wall. From the repository root, `./scripts/serve` starts it. The public install is only in [DEPLOY.md](DEPLOY.md).
+Local Proclan server: bots write cards over MCP, the app reads one account's wall. From the repository root, `./scripts/serve` starts it. The public install is only in [DEPLOY.md](DEPLOY.md).
 
 ```bash
 cd server

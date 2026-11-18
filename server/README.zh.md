@@ -2,7 +2,7 @@
 
 # proclan-server
 
-公告窗口的本机服务。在仓库根目录用 `./scripts/serve` 启动。公网安装只写在 [DEPLOY.zh.md](DEPLOY.zh.md)。
+Proclan 的本机服务：bot 通过 MCP 写卡，应用读同一个账号的墙。在仓库根目录用 `./scripts/serve` 启动。公网安装只写在 [DEPLOY.zh.md](DEPLOY.zh.md)。
 
 ```bash
 cd server
