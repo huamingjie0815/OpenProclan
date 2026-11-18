@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In zh, this message translates to:
-  /// **'个人日报'**
+  /// **'成果墙'**
   String get appTitle;
 
   /// No description provided for @weekdayMon.
@@ -191,7 +191,7 @@ abstract class AppLocalizations {
   /// No description provided for @offline.
   ///
   /// In zh, this message translates to:
-  /// **'暂时连不上收件服务'**
+  /// **'暂时连不上服务'**
   String get offline;
 
   /// No description provided for @retry.
@@ -257,7 +257,7 @@ abstract class AppLocalizations {
   /// No description provided for @emptyNoneBody.
   ///
   /// In zh, this message translates to:
-  /// **'有新内容时会出现在这里。'**
+  /// **'bot 推来卡片后会出现在这里。'**
   String get emptyNoneBody;
 
   /// No description provided for @emptyUnreadTitle.
@@ -299,19 +299,19 @@ abstract class AppLocalizations {
   /// No description provided for @groupCountOne.
   ///
   /// In zh, this message translates to:
-  /// **'1 则'**
+  /// **'1 张'**
   String get groupCountOne;
 
   /// No description provided for @groupCount.
   ///
   /// In zh, this message translates to:
-  /// **'{count} 则'**
+  /// **'{count} 张'**
   String groupCount(int count);
 
   /// No description provided for @endEdition.
   ///
   /// In zh, this message translates to:
-  /// **'本期完 · 共 {count} 则'**
+  /// **'今天共 {count} 张'**
   String endEdition(int count);
 
   /// No description provided for @unreadOnly.
@@ -479,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @back.
   ///
   /// In zh, this message translates to:
-  /// **'返回信息流'**
+  /// **'返回'**
   String get back;
 
   /// No description provided for @markUnread.
@@ -509,7 +509,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteBody.
   ///
   /// In zh, this message translates to:
-  /// **'删除后不会再出现在信息流里，这一步不能撤回。'**
+  /// **'删除后不会再出现在你的墙上，这一步不能撤回。'**
   String get deleteBody;
 
   /// No description provided for @cancel.
@@ -551,7 +551,7 @@ abstract class AppLocalizations {
   /// No description provided for @sourceNote.
   ///
   /// In zh, this message translates to:
-  /// **'已收录到你的日报'**
+  /// **'已贴到你的墙上'**
   String get sourceNote;
 
   /// No description provided for @openOriginal.
@@ -587,7 +587,7 @@ abstract class AppLocalizations {
   /// No description provided for @cacheMode.
   ///
   /// In zh, this message translates to:
-  /// **'消息缓存'**
+  /// **'卡片缓存'**
   String get cacheMode;
 
   /// No description provided for @cacheNote.
@@ -791,7 +791,7 @@ abstract class AppLocalizations {
   /// No description provided for @botLatestEmpty.
   ///
   /// In zh, this message translates to:
-  /// **'服务端没有这个 bot 还留着的消息。'**
+  /// **'服务端没有这个 bot 还留着的卡片。'**
   String get botLatestEmpty;
 
   /// No description provided for @botDelete.
@@ -875,7 +875,7 @@ abstract class AppLocalizations {
   /// No description provided for @rotateBody.
   ///
   /// In zh, this message translates to:
-  /// **'轮换后，Grok 里的 Proclan 连接会断开，需要把新 token 重新贴进请求头。'**
+  /// **'轮换后，已经连着的 Proclan 连接会断开，需要把新 token 重新贴进请求头。'**
   String get rotateBody;
 
   /// No description provided for @rotated.
@@ -983,7 +983,7 @@ abstract class AppLocalizations {
   /// No description provided for @communityUnfollowBody.
   ///
   /// In zh, this message translates to:
-  /// **'之后不再收到这个 Bot 的新卡片。已经收到的卡片还留在信息流里。'**
+  /// **'之后不再收到这个 Bot 的新卡片。已经收到的卡片还留在你的墙上。'**
   String get communityUnfollowBody;
 
   /// No description provided for @communityUnfollow.
@@ -1175,7 +1175,7 @@ abstract class AppLocalizations {
   /// No description provided for @loginSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'登录后，只看属于你的日报。'**
+  /// **'登录后，看到你自己的 AI 成果墙。'**
   String get loginSubtitle;
 
   /// No description provided for @signIn.
@@ -1283,31 +1283,31 @@ abstract class AppLocalizations {
   /// No description provided for @authHeadline1.
   ///
   /// In zh, this message translates to:
-  /// **'把信息流，'**
+  /// **'把成果，'**
   String get authHeadline1;
 
   /// No description provided for @authHeadline2.
   ///
   /// In zh, this message translates to:
-  /// **'还给自己。'**
+  /// **'留在自己手里。'**
   String get authHeadline2;
 
   /// No description provided for @authVisualSub.
   ///
   /// In zh, this message translates to:
-  /// **'只读你选的主题，只留下你想记住的。'**
+  /// **'只收你自己的 bot，和你关注的 bot。'**
   String get authVisualSub;
 
   /// No description provided for @authVisualFoot.
   ///
   /// In zh, this message translates to:
-  /// **'只属于你的日报'**
+  /// **'你的 AI 成果墙'**
   String get authVisualFoot;
 
   /// No description provided for @authFoot.
   ///
   /// In zh, this message translates to:
-  /// **'你的卡片只属于你 · 不上推荐流'**
+  /// **'你的卡片只属于你 · 来源由你决定'**
   String get authFoot;
 
   /// No description provided for @loginTitle.
@@ -1325,13 +1325,13 @@ abstract class AppLocalizations {
   /// No description provided for @registerSub.
   ///
   /// In zh, this message translates to:
-  /// **'起一个用户名，建一份只属于你的日报。'**
+  /// **'起一个用户名，建一面自己的成果墙。'**
   String get registerSub;
 
   /// No description provided for @mastheadNote.
   ///
   /// In zh, this message translates to:
-  /// **'只读你选的主题，只留下你想记住的。'**
+  /// **'只收你自己的 bot，和你关注的 bot。'**
   String get mastheadNote;
 
   /// No description provided for @appearance.

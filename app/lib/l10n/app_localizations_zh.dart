@@ -10,7 +10,7 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => '个人日报';
+  String get appTitle => '成果墙';
 
   @override
   String get weekdayMon => '周一';
@@ -57,7 +57,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get refreshDone => '已同步 · 刚刚';
 
   @override
-  String get offline => '暂时连不上收件服务';
+  String get offline => '暂时连不上服务';
 
   @override
   String get retry => '重试';
@@ -90,7 +90,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get emptyNoneTitle => '还没有卡片';
 
   @override
-  String get emptyNoneBody => '有新内容时会出现在这里。';
+  String get emptyNoneBody => 'bot 推来卡片后会出现在这里。';
 
   @override
   String get emptyUnreadTitle => '没有未读卡片了';
@@ -113,16 +113,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get groupCountOne => '1 则';
+  String get groupCountOne => '1 张';
 
   @override
   String groupCount(int count) {
-    return '$count 则';
+    return '$count 张';
   }
 
   @override
   String endEdition(int count) {
-    return '本期完 · 共 $count 则';
+    return '今天共 $count 张';
   }
 
   @override
@@ -221,7 +221,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readProgress => '阅读进度';
 
   @override
-  String get back => '返回信息流';
+  String get back => '返回';
 
   @override
   String get markUnread => '标记为未读';
@@ -236,7 +236,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteTitle => '删除这张卡片？';
 
   @override
-  String get deleteBody => '删除后不会再出现在信息流里，这一步不能撤回。';
+  String get deleteBody => '删除后不会再出现在你的墙上，这一步不能撤回。';
 
   @override
   String get cancel => '取消';
@@ -257,7 +257,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareFailed => '没能打开分享';
 
   @override
-  String get sourceNote => '已收录到你的日报';
+  String get sourceNote => '已贴到你的墙上';
 
   @override
   String get openOriginal => '打开原文';
@@ -275,7 +275,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get securitySub => '用户名与密码';
 
   @override
-  String get cacheMode => '消息缓存';
+  String get cacheMode => '卡片缓存';
 
   @override
   String get cacheNote => '只影响这台设备上已经拉到的卡片。重装之后，已读和这些卡片不会回来。';
@@ -377,7 +377,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get botLatest => '近期推送';
 
   @override
-  String get botLatestEmpty => '服务端没有这个 bot 还留着的消息。';
+  String get botLatestEmpty => '服务端没有这个 bot 还留着的卡片。';
 
   @override
   String get botDelete => '删除';
@@ -422,7 +422,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get rotateTitle => '轮换 bot token？';
 
   @override
-  String get rotateBody => '轮换后，Grok 里的 Proclan 连接会断开，需要把新 token 重新贴进请求头。';
+  String get rotateBody => '轮换后，已经连着的 Proclan 连接会断开，需要把新 token 重新贴进请求头。';
 
   @override
   String get rotated => 'token 已轮换';
@@ -480,7 +480,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get communityUnfollowTitle => '取消关注？';
 
   @override
-  String get communityUnfollowBody => '之后不再收到这个 Bot 的新卡片。已经收到的卡片还留在信息流里。';
+  String get communityUnfollowBody => '之后不再收到这个 Bot 的新卡片。已经收到的卡片还留在你的墙上。';
 
   @override
   String get communityUnfollow => '取消关注';
@@ -576,7 +576,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get logoutBody => '这台设备上的卡片还留着。下次登录仍是这个账号。';
 
   @override
-  String get loginSubtitle => '登录后，只看属于你的日报。';
+  String get loginSubtitle => '登录后，看到你自己的 AI 成果墙。';
 
   @override
   String get signIn => '登录';
@@ -630,19 +630,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sessionExpired => '登录已失效，请重新登录';
 
   @override
-  String get authHeadline1 => '把信息流，';
+  String get authHeadline1 => '把成果，';
 
   @override
-  String get authHeadline2 => '还给自己。';
+  String get authHeadline2 => '留在自己手里。';
 
   @override
-  String get authVisualSub => '只读你选的主题，只留下你想记住的。';
+  String get authVisualSub => '只收你自己的 bot，和你关注的 bot。';
 
   @override
-  String get authVisualFoot => '只属于你的日报';
+  String get authVisualFoot => '你的 AI 成果墙';
 
   @override
-  String get authFoot => '你的卡片只属于你 · 不上推荐流';
+  String get authFoot => '你的卡片只属于你 · 来源由你决定';
 
   @override
   String get loginTitle => '欢迎回来';
@@ -651,10 +651,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get registerTitle => '创建账号';
 
   @override
-  String get registerSub => '起一个用户名，建一份只属于你的日报。';
+  String get registerSub => '起一个用户名，建一面自己的成果墙。';
 
   @override
-  String get mastheadNote => '只读你选的主题，只留下你想记住的。';
+  String get mastheadNote => '只收你自己的 bot，和你关注的 bot。';
 
   @override
   String get appearance => '外观主题';

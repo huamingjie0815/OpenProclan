@@ -14,7 +14,7 @@ Keep the framing. Proclan is not a news reader, not a daily digest, and not an a
 
 The wall rolls: cards older than `BOT_MESSAGE_TTL_HOURS` (default 24, minimum 1) are not listed or readable. They stay in the table; no purge job exists. Do not add one, and do not describe the product as an archive.
 
-Copy that still says 日报 / daily / 公告墙 belongs to the old positioning. Replace it with work-and-wall wording when you touch those strings, and keep both languages in step. The app's l10n keys that still carry the old framing are listed in [plans/DESIGN.md](plans/DESIGN.md).
+Copy that still says 日报 / daily / 公告墙 belongs to the old positioning. Replace it with work-and-wall wording when you touch those strings, and keep both languages in step. The app's strings live in `app/lib/l10n/app_zh.arb` (the template) and `app_en.arb`, with generated `app_localizations*.dart` committed. Change both languages, regenerate, then run `flutter test`.
 
 ## Commands
 
