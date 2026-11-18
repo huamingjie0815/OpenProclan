@@ -1,0 +1,91 @@
+name: Android release
+
+# main 有新提交就出一个生产包；也可以在 Actions 页面手动触发。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.50.0
+  # 生产地址。App 把 API_BASE 当源站用，自己拼 /v1/...，所以这里不带路径。
+  # 想换地址不用改这个文件：仓库 Settings → Variables 加 PROCLAN_API_BASE。
+  API_BASE: ${{ vars.PROCLAN_API_BASE || 'https://proclan.online' }}
+
+jobs:
+  apk:
+    name: Build production APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Show toolchain
+        run: |
+          flutter --version
+          java -version
+
+      - name: Write production env
+        run: |
+          case "$API_BASE" in
+            https://*) ;;
+            *) echo "API_BASE must be an https origin, got: $API_BASE" >&2; exit 1 ;;
+          esac
+          printf 'API_BASE=%s\n' "$API_BASE" > app/.env.production
+          echo "building against $API_BASE"
+
+      - name: Resolve dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Widget tests
+        working-directory: app
+        run: flutter test
+
+      - name: Build release APK
+        run: ./scripts/apk production
+
+      - name: Checksum and summary
+        run: |
+          apk=app/build/app/outputs/flutter-apk/app-release.apk
+          sha256sum "$apk" | tee apk.sha256
+          {
+            echo "### Proclan APK"
+            echo ""
+            echo "| 字段 | 值 |"
+            echo "| --- | --- |"
+            echo "| API_BASE | \`$API_BASE\` |"
+            echo "| commit | \`$GITHUB_SHA\` |"
+            echo "| 文件大小 | $(du -h "$apk" | cut -f1) |"
+            echo "| sha256 | \`$(cut -d' ' -f1 apk.sha256)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: proclan-apk-${{ github.sha }}
+          path: |
+            app/build/app/outputs/flutter-apk/app-release.apk
+            apk.sha256
+          if-no-files-found: error
+          retention-days: 30
