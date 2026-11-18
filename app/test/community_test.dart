@@ -110,7 +110,7 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('community-card-c1')));
     await tester.tap(find.byKey(const Key('community-card-c1')));
     await tester.pumpAndSettle();
-    expect(find.text('正文'), findsOneWidget);
+    expect(find.text('正文', findRichText: true), findsOneWidget);
     expect(find.text('删除卡片'), findsNothing);
     expect(find.text('标记为未读'), findsNothing);
     expect(find.text('日报 · 林间'), findsOneWidget);

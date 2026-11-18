@@ -49,7 +49,7 @@ cd server && uv run python -m proclan_server.set_password <username> <new-passwo
 
 The command uses the same `NOCASE` lookup, stores an argon2id hash, deletes that user's sessions, and does not rotate the bot token. It exits non-zero when the user is missing. Run it from `server/` so it reads `server/.env`.
 
-Feed, bots, MCP, settings, Markdown body, cache, and read state are keyed by user id and tokens. The masthead avatar is the username initial.
+Feed, bots, MCP, settings, article body, cache, and read state are keyed by user id and tokens. The masthead avatar is the username initial.
 
 ## Do not change
 
@@ -68,7 +68,7 @@ These are the installed contracts:
 - `app/android/app/proguard-rules.pro`. Removing it makes release stop on the splash screen.
 - Release keeps the Android debug signing config. This is a sideload build, not a store package.
 
-Keep the title, summary, body, and tags as submitted. UI copy may switch between Chinese and English. Empty states and delete say "card".
+Keep the title, summary, body, and tags as submitted. The stored body and the feed body stay as submitted. Optional charts are bar, line, or pie. Optional video URLs play in the detail page when the URL is a direct file. UI copy may switch between Chinese and English. Empty states and delete say "card".
 
 README, DEPLOY, and the other docs describe the current behavior and match the code. Do not write upgrade steps. There is no `server/migrate/`. Do not add one.
 

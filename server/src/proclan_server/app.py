@@ -452,6 +452,8 @@ def _card_json(card: Card, request: Request) -> dict:
         "images": [_image_url(name, base) for name in card.images],
         "source": card.source,
         "source_urls": card.source_urls,
+        "charts": card.charts,
+        "video_urls": card.video_urls,
         "created_bot": card.created_bot,
         "created_at": card.created_at,
     }

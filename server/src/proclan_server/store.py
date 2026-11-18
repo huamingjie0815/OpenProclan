@@ -8,7 +8,7 @@ import sqlite3
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -45,6 +45,8 @@ class Card:
     source_bot_name: str | None = None
     source_card_id: str | None = None
     source_username: str | None = None
+    charts: list[dict] = field(default_factory=list)
+    video_urls: list[str] = field(default_factory=list)
 
 
 class CommunityError(Exception):
@@ -108,6 +110,8 @@ class Store:
                     images_json TEXT NOT NULL,
                     source TEXT NOT NULL,
                     source_urls_json TEXT NOT NULL,
+                    charts_json TEXT NOT NULL DEFAULT '[]',
+                    video_urls_json TEXT NOT NULL DEFAULT '[]',
                     created_bot TEXT NOT NULL DEFAULT '',
                     processor TEXT NOT NULL,
                     is_read INTEGER NOT NULL DEFAULT 0,
@@ -220,6 +224,11 @@ class Store:
             for column in ("source_user_id", "source_bot_name", "source_card_id"):
                 if column not in have:
                     conn.execute(f"ALTER TABLE cards ADD COLUMN {column} TEXT")
+            for column in ("charts_json", "video_urls_json"):
+                if column not in have:
+                    conn.execute(
+                        f"ALTER TABLE cards ADD COLUMN {column} TEXT NOT NULL DEFAULT '[]'"
+                    )
 
     def publish_batch(
         self,
@@ -1095,9 +1104,9 @@ def _insert_card(conn: sqlite3.Connection, card: Card) -> None:
         """
         INSERT INTO cards
             (id, message_id, title, summary, body, category, tags_json, images_json,
-             source, source_urls_json, created_bot, processor, is_read, created_at, user_id,
-             source_user_id, source_bot_name, source_card_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             source, source_urls_json, charts_json, video_urls_json, created_bot, processor,
+             is_read, created_at, user_id, source_user_id, source_bot_name, source_card_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             card.id,
@@ -1110,6 +1119,8 @@ def _insert_card(conn: sqlite3.Connection, card: Card) -> None:
             json.dumps(card.images, ensure_ascii=False),
             card.source,
             json.dumps(card.source_urls, ensure_ascii=False),
+            json.dumps(card.charts, ensure_ascii=False),
+            json.dumps(card.video_urls, ensure_ascii=False),
             card.created_bot,
             card.processor,
             0,
@@ -1160,6 +1171,8 @@ def _fan_out(conn: sqlite3.Connection, cards: list[Card]) -> None:
                     source=card.source,
                     source_urls=list(card.source_urls),
                     created_bot=card.created_bot,
+                    charts=[dict(item) for item in card.charts],
+                    video_urls=list(card.video_urls),
                     processor=card.processor,
                     is_read=False,
                     created_at=card.created_at,
@@ -1205,6 +1218,10 @@ def _card(row: sqlite3.Row) -> Card:
         source_bot_name=row["source_bot_name"] if "source_bot_name" in keys else None,
         source_card_id=row["source_card_id"] if "source_card_id" in keys else None,
         source_username=row["source_username"] if "source_username" in keys else None,
+        charts=json.loads(row["charts_json"]) if "charts_json" in keys and row["charts_json"] else [],
+        video_urls=json.loads(row["video_urls_json"])
+        if "video_urls_json" in keys and row["video_urls_json"]
+        else [],
     )
 
 

@@ -1,10 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:markdown/markdown.dart' as md;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'article.dart';
 import 'chrome.dart';
 import 'feed_client.dart';
 import 'l10n/app_localizations.dart';
@@ -12,7 +10,8 @@ import 'red.dart';
 
 enum DetailResult { deleted, markedUnread }
 
-/// Title, summary, body, source, and source links.
+/// Title, summary, body, source, source links, and video URLs.
+/// A lone `[[chart:N]]` line is left out. The same line inside a fence stays.
 /// Image URLs stay out: `/media` needs the session and expires with the card.
 String cardShareText(FeedCard card) {
   final parts = <String>[];
@@ -23,17 +22,22 @@ String cardShareText(FeedCard card) {
     }
   }
 
+  void addLines(List<String> lines) {
+    final kept = [
+      for (final line in lines)
+        if (line.trim().isNotEmpty) line.trim(),
+    ];
+    if (kept.isNotEmpty) {
+      parts.add(kept.join('\n'));
+    }
+  }
+
   add(card.title);
   add(card.summary);
-  add(card.body);
+  add(shareBody(card.body));
   add(card.source);
-  final urls = [
-    for (final url in card.sourceUrls)
-      if (url.trim().isNotEmpty) url.trim(),
-  ];
-  if (urls.isNotEmpty) {
-    parts.add(urls.join('\n'));
-  }
+  addLines(card.sourceUrls);
+  addLines(card.videoUrls);
   return parts.join('\n\n');
 }
 
@@ -91,6 +95,8 @@ class _DetailPageState extends State<DetailPage> {
   final _scroll = ScrollController();
   var _progress = 0.0;
   var _deleting = false;
+  int? _activeVideo;
+  late final List<ArticlePiece> _pieces = articlePieces(widget.card.body);
 
   @override
   void initState() {
@@ -244,7 +250,15 @@ class _DetailPageState extends State<DetailPage> {
     final wide = width >= 690;
     final pad = Red.gutter(width);
     final time = detailWhen(l, card.createdAt);
-    final body = card.body.trim();
+    final imageHeight = wide ? 460.0 : 440.0;
+    final slots = articleSlots(
+      pieces: _pieces,
+      charts: card.charts,
+      wide: wide,
+      imageMaxHeight: imageHeight,
+      imageHeadersFor: widget.client.imageHeadersFor,
+      onOpen: _open,
+    );
     final bottom = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       backgroundColor: Red.bg,
@@ -363,10 +377,10 @@ class _DetailPageState extends State<DetailPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           for (final url in card.images)
-                            _Figure(
+                            ArticleFigure(
                               url: url,
                               headers: widget.client.imageHeadersFor(url),
-                              maxHeight: wide ? 460 : 440,
+                              maxHeight: imageHeight,
                             ),
                           Padding(
                             padding: wide
@@ -375,107 +389,118 @@ class _DetailPageState extends State<DetailPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text(
-                                  card.title,
-                                  style: Red.text(
-                                    size: wide ? 40 : 30,
-                                    height: wide ? 1.2 : 1.25,
-                                    letterSpacing: Red.em(
-                                      wide ? 40 : 30,
-                                      -0.028,
-                                    ),
-                                    weight: FontWeight.w500,
-                                  ),
-                                ),
-                                if (card.summary.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    card.summary,
-                                    style: Red.text(
-                                      size: wide ? 16 : 15,
-                                      color: Red.muted,
-                                      height: 1.7,
-                                    ),
+                                for (
+                                  var i = 0;
+                                  i < card.videoUrls.length;
+                                  i++
+                                ) ...[
+                                  if (i > 0) const SizedBox(height: 12),
+                                  ArticleVideo(
+                                    url: card.videoUrls[i],
+                                    index: i,
+                                    active: _activeVideo == i,
+                                    onActivate: () {
+                                      setState(() => _activeVideo = i);
+                                    },
+                                    onOpen: _open,
                                   ),
                                 ],
-                                if (body.isNotEmpty) ...[
-                                  const SizedBox(height: 20),
-                                  ColoredBox(
-                                    color: Red.border,
-                                    child: const SizedBox(height: 1),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  MarkdownBody(
-                                    data: body,
-                                    selectable: true,
-                                    softLineBreak: true,
-                                    fitContent: false,
-                                    styleSheet: _articleSheet(wide),
-                                    onTapLink: (_, href, _) {
-                                      if (href != null) {
-                                        _open(href);
-                                      }
-                                    },
-                                    imageBuilder: (uri, _, _) {
-                                      if (uri.scheme != 'http' &&
-                                          uri.scheme != 'https') {
-                                        return const SizedBox.shrink();
-                                      }
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
-                                        ),
-                                        child: _Figure(
-                                          url: uri.toString(),
-                                          headers: widget.client
-                                              .imageHeadersFor(uri.toString()),
-                                          maxHeight: wide ? 460 : 440,
-                                        ),
-                                      );
-                                    },
-                                    builders: {'hr': _HairlineBuilder()},
-                                  ),
-                                ],
-                                if (card.tags.isNotEmpty) ...[
-                                  const SizedBox(height: 20),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
+                                SelectionArea(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
-                                      for (final tag in card.tags)
-                                        DecoratedBox(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                            border: Border.all(
-                                              color: Red.border,
-                                            ),
+                                      if (card.videoUrls.isNotEmpty)
+                                        const SizedBox(height: 20),
+                                      Text(
+                                        card.title,
+                                        style: Red.text(
+                                          size: wide ? 40 : 30,
+                                          height: wide ? 1.2 : 1.25,
+                                          letterSpacing: Red.em(
+                                            wide ? 40 : 30,
+                                            -0.028,
                                           ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 9,
-                                              vertical: 6,
-                                            ),
-                                            child: Text(
-                                              tag.toUpperCase(),
-                                              style: Red.text(
-                                                size: 10,
-                                                color: Red.muted,
-                                                height: 1.2,
-                                                letterSpacing: 0.7,
-                                              ),
-                                            ),
+                                          weight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      if (card.summary.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          card.summary,
+                                          style: Red.text(
+                                            size: wide ? 16 : 15,
+                                            color: Red.muted,
+                                            height: 1.7,
                                           ),
                                         ),
+                                      ],
+                                      if (slots.isNotEmpty) ...[
+                                        const SizedBox(height: 20),
+                                        ColoredBox(
+                                          color: Red.border,
+                                          child: const SizedBox(height: 1),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        ...slots,
+                                      ],
+                                      if (card.tags.isNotEmpty) ...[
+                                        const SizedBox(height: 20),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: [
+                                            for (final tag in card.tags)
+                                              DecoratedBox(
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                  border: Border.all(
+                                                    color: Red.border,
+                                                  ),
+                                                ),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 9,
+                                                        vertical: 6,
+                                                      ),
+                                                  child: Text(
+                                                    tag.toUpperCase(),
+                                                    style: Red.text(
+                                                      size: 10,
+                                                      color: Red.muted,
+                                                      height: 1.2,
+                                                      letterSpacing: 0.7,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                      if (card.source.isNotEmpty ||
+                                          card.sourceUrls.isNotEmpty) ...[
+                                        const SizedBox(height: 20),
+                                        _SourceBox(card: card, onOpen: _open),
+                                      ],
+                                      if (card.createdBot.isNotEmpty) ...[
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          card.sourceUsername.isEmpty
+                                              ? card.createdBot.toUpperCase()
+                                              : '${card.createdBot.toUpperCase()} · ${card.sourceUsername}',
+                                          style: Red.text(
+                                            size: 10.5,
+                                            color: Red.meta,
+                                            height: 1.4,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   ),
-                                ],
-                                if (card.source.isNotEmpty ||
-                                    card.sourceUrls.isNotEmpty) ...[
-                                  const SizedBox(height: 20),
-                                  _SourceBox(card: card, onOpen: _open),
-                                ],
+                                ),
                                 if (widget.manage) ...[
                                   const SizedBox(height: 20),
                                   Align(
@@ -487,42 +512,28 @@ class _DetailPageState extends State<DetailPage> {
                                   ),
                                   const SizedBox(height: 8),
                                   OutlinedButton.icon(
-                                  onPressed: _deleting ? null : _delete,
-                                  icon: Icon(
-                                    Icons.delete_outline,
-                                    size: 15,
-                                    color: Red.dangerFg,
-                                  ),
-                                  label: Text(l.deleteCard.toUpperCase()),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Red.dangerFg,
-                                    disabledForegroundColor: Red.muted,
-                                    side: BorderSide(color: Red.dangerLine),
-                                    minimumSize: const Size.fromHeight(46),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    textStyle: Red.text(
-                                      size: 11,
-                                      height: 1,
-                                      weight: FontWeight.w500,
-                                      letterSpacing: 0.4,
+                                    onPressed: _deleting ? null : _delete,
+                                    icon: Icon(
+                                      Icons.delete_outline,
+                                      size: 15,
                                       color: Red.dangerFg,
                                     ),
-                                  ),
-                                ),
-                                ],
-                                if (card.createdBot.isNotEmpty) ...[
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    card.sourceUsername.isEmpty
-                                        ? card.createdBot.toUpperCase()
-                                        : '${card.createdBot.toUpperCase()} · ${card.sourceUsername}',
-                                    style: Red.text(
-                                      size: 10.5,
-                                      color: Red.meta,
-                                      height: 1.4,
-                                      letterSpacing: 0.5,
+                                    label: Text(l.deleteCard.toUpperCase()),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Red.dangerFg,
+                                      disabledForegroundColor: Red.muted,
+                                      side: BorderSide(color: Red.dangerLine),
+                                      minimumSize: const Size.fromHeight(46),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      textStyle: Red.text(
+                                        size: 11,
+                                        height: 1,
+                                        weight: FontWeight.w500,
+                                        letterSpacing: 0.4,
+                                        color: Red.dangerFg,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -538,49 +549,6 @@ class _DetailPageState extends State<DetailPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Figure extends StatelessWidget {
-  const _Figure({
-    required this.url,
-    required this.headers,
-    required this.maxHeight,
-  });
-
-  final String url;
-  final Map<String, String> headers;
-  final double maxHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Red.surfaceWarm,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: 120, maxHeight: maxHeight),
-          child: CachedNetworkImage(
-            imageUrl: url,
-            httpHeaders: headers.isEmpty ? null : headers,
-            fit: BoxFit.contain,
-            width: double.infinity,
-            alignment: Alignment.center,
-            fadeInDuration: Duration.zero,
-            fadeOutDuration: Duration.zero,
-            placeholderFadeInDuration: Duration.zero,
-            placeholder: (_, _) => const SizedBox(height: 180),
-            errorWidget: (_, _, _) => SizedBox(
-              height: 180,
-              child: Icon(Icons.image_not_supported_outlined, color: Red.meta),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -736,86 +704,4 @@ class _DangerButton extends StatelessWidget {
       child: Text(label),
     );
   }
-}
-
-class _HairlineBuilder extends MarkdownElementBuilder {
-  @override
-  Widget visitElementAfterWithContext(
-    BuildContext context,
-    md.Element element,
-    TextStyle? preferredStyle,
-    TextStyle? parentStyle,
-  ) {
-    return SizedBox(
-      height: 1,
-      width: double.infinity,
-      child: ColoredBox(color: Red.border),
-    );
-  }
-}
-
-MarkdownStyleSheet _articleSheet(bool wide) {
-  final size = wide ? 17.0 : 16.0;
-  final body = Red.text(size: size, height: 1.8, color: Red.fg2);
-  TextStyle heading(double headingSize) {
-    return Red.text(
-      size: headingSize,
-      height: 1.3,
-      weight: FontWeight.w500,
-      letterSpacing: Red.em(headingSize, -0.028),
-      color: Red.fg,
-    );
-  }
-
-  return MarkdownStyleSheet(
-    p: body,
-    pPadding: EdgeInsets.zero,
-    h1: heading(wide ? 28 : 24),
-    h1Padding: EdgeInsets.zero,
-    h2: heading(wide ? 22 : 20),
-    h2Padding: EdgeInsets.zero,
-    h3: heading(wide ? 18 : 17),
-    h3Padding: EdgeInsets.zero,
-    h4: heading(size),
-    h4Padding: EdgeInsets.zero,
-    h5: heading(size - 1),
-    h5Padding: EdgeInsets.zero,
-    h6: heading(size - 2),
-    h6Padding: EdgeInsets.zero,
-    a: TextStyle(
-      color: Red.fg,
-      decoration: TextDecoration.underline,
-      decorationColor: Red.fg,
-    ),
-    em: const TextStyle(fontStyle: FontStyle.italic),
-    strong: TextStyle(fontWeight: FontWeight.w600, color: Red.fg),
-    del: const TextStyle(decoration: TextDecoration.lineThrough),
-    blockquote: body.copyWith(color: Red.muted),
-    blockquotePadding: const EdgeInsets.only(left: 14),
-    blockquoteDecoration: BoxDecoration(
-      border: Border(left: BorderSide(color: Red.lineStrong, width: 2)),
-    ),
-    code: Red.text(
-      size: size * 0.88,
-      height: 1.5,
-      color: Red.fg,
-    ).copyWith(fontFamily: 'monospace', backgroundColor: Red.surfaceWarm),
-    codeblockPadding: const EdgeInsets.all(12),
-    codeblockDecoration: BoxDecoration(
-      color: Red.surfaceWarm,
-      borderRadius: BorderRadius.circular(4),
-      border: Border.all(color: Red.border),
-    ),
-    blockSpacing: 16,
-    listIndent: 24,
-    listBullet: body,
-    listBulletPadding: const EdgeInsets.only(right: 8),
-    checkbox: body.copyWith(color: Red.fg),
-    tableHead: body.copyWith(color: Red.fg, fontWeight: FontWeight.w600),
-    tableBody: body,
-    tableHeadAlign: TextAlign.left,
-    tableBorder: TableBorder.all(color: Red.border),
-    tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-    tableCellsDecoration: const BoxDecoration(),
-  );
 }

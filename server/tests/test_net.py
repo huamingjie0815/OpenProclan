@@ -9,3 +9,4 @@ def test_private_urls_are_refused():
     assert not is_public_url("file:///etc/passwd")
     assert is_public_url("https://1.1.1.1/story")
     assert is_public_url("https://198.18.0.8/story")
+    assert is_public_url("https://www.youtube.com/watch?v=jNQXAC9IVRw")

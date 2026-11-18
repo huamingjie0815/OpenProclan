@@ -1,9 +1,12 @@
-"""Refuse private and non-public image URLs."""
+"""Accept http(s) links. Refuse a literal private address.
+
+Names are not resolved. This machine may be unable to look up a host the
+phone can open, and the server does not fetch the URL.
+"""
 
 from __future__ import annotations
 
 import ipaddress
-import socket
 from urllib.parse import urlparse
 
 
@@ -17,24 +20,11 @@ def is_public_url(url: str) -> bool:
     try:
         literal = ipaddress.ip_address(host)
     except ValueError:
-        literal = None
-    if literal is not None:
-        return _public_ip(literal)
-    try:
-        infos = socket.getaddrinfo(host, None)
-    except socket.gaierror:
-        return False
-    addresses = []
-    for info in infos:
-        try:
-            addresses.append(ipaddress.ip_address(info[4][0]))
-        except ValueError:
-            return False
-    return bool(addresses) and all(_public_ip(ip) for ip in addresses)
+        return True
+    return _public_ip(literal)
 
 
-# Some local proxies answer public DNS with 198.18.0.0/15. That range is not a
-# LAN the server should refuse, or every real image URL fails closed.
+# A literal address in this range is a local proxy's stand-in for a public host.
 _PROXY_FAKE_IP = ipaddress.ip_network("198.18.0.0/15")
 
 

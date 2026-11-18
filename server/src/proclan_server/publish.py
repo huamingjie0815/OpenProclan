@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from datetime import timedelta
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
@@ -24,6 +25,16 @@ _BOT = 40
 _BOT_DESC = 200
 _SOURCE_URLS = 4
 _IMAGES = 6
+_CHARTS = 8
+_CHART_TITLE = 40
+_CHART_LABELS = 12
+_CHART_LABEL = 12
+_CHART_SERIES = 4
+_CHART_NAME = 12
+_VIDEOS = 4
+_CHART_SHAPE = (
+    '{"type":"bar","title":"本周","labels":["甲","乙"],"series":[{"name":"产量","data":[1,2]}]}'
+)
 
 def submit_cards_doc(
     burst: int,
@@ -39,7 +50,8 @@ def submit_cards_doc(
 {name_limit_text(name_burst, name_refill_seconds, name_cap)}
 文本或原文链接不合格时，整批不入库。
 服务不改写标题、摘要、正文、来源或分类。body 可以写 Markdown。
-不要提交已读状态。非公网或不是 http(s) 的 image_urls 会丢掉，卡片仍入库。
+charts 和 video_urls 可选，具体写法以这两个字段和 body 的 description 为准。
+不要提交已读状态。不是 http(s)，或写成内网、本机地址的 image_urls 和 video_urls 会丢掉，卡片仍入库。域名不在服务器上解析。
 """
 
 
@@ -63,6 +75,36 @@ class CardRejected(Exception):
         self.detail = detail
 
 
+class _Series(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(default="", max_length=_CHART_NAME)
+    data: list[float] = Field(min_length=1)
+
+
+class _Chart(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    type: Literal["bar", "line", "pie"]
+    title: str = Field(default="", max_length=_CHART_TITLE)
+    labels: list[Annotated[str, Field(min_length=1, max_length=_CHART_LABEL)]] = Field(
+        min_length=1,
+        max_length=_CHART_LABELS,
+    )
+    series: list[_Series] = Field(min_length=1, max_length=_CHART_SERIES)
+
+    @model_validator(mode="after")
+    def _shape(self) -> _Chart:
+        if self.type == "pie" and len(self.series) != 1:
+            raise ValueError("pie 只能有一组 series")
+        for index, series in enumerate(self.series, start=1):
+            if len(series.data) != len(self.labels):
+                raise ValueError(f"第 {index} 组 data 的长度必须和 labels 一样")
+            if any(not math.isfinite(value) for value in series.data):
+                raise ValueError("data 必须是有限数字")
+        return self
+
+
 def _hint() -> str:
     names = "、".join(CardIn.model_json_schema()["required"])
     return f"当前必填：{names}"
@@ -80,6 +122,7 @@ class CardIn(BaseModel):
         description=(
             f"正文。可空，最多 {_BODY} 字。可以写 Markdown"
             "（标题、强调、列表、引用、代码、链接、表格、图片）。服务不改写。"
+            "要在段落之间放图，单独一行只写 [[chart:N]]，N 是 charts 的下标，不要在正文里写数据。"
         ),
     )
     tags: list[Annotated[str, Field(max_length=_TAG)]] = Field(
@@ -90,12 +133,43 @@ class CardIn(BaseModel):
     image_urls: list[str] = Field(
         default_factory=list,
         max_length=_IMAGES,
-        description=f"配图地址。最多 {_IMAGES} 条。非公网或不是 http(s) 的图会丢掉，卡片仍入库。",
+        description=(
+            f"配图地址。最多 {_IMAGES} 条。不是 http(s)，或写成内网、本机地址的会丢掉，卡片仍入库。"
+            "域名不在这台服务器上解析。"
+        ),
+    )
+    charts: list[_Chart] = Field(
+        default_factory=list,
+        max_length=_CHARTS,
+        description=(
+            f"图表。可空，最多 {_CHARTS} 张。每一项是 {_CHART_SHAPE}。"
+            "type 只能是 bar、line、pie。折线把 type 换成 line。"
+            "饼图 type 是 pie，只能有一组 series，labels 是扇区名。"
+            f"title 可空，最多 {_CHART_TITLE} 字。"
+            f"labels 1 到 {_CHART_LABELS} 项，每项最多 {_CHART_LABEL} 字。"
+            f"series 1 到 {_CHART_SERIES} 组，name 可空、最多 {_CHART_NAME} 字，"
+            "data 是有限数字且长度和 labels 一样。"
+            "不要把数据写进正文。正文单独一行 [[chart:0]] 把第一张图放在那里，下标从 0 开始。"
+            "没写标记的图会排在正文后面。"
+        ),
+    )
+    video_urls: list[str] = Field(
+        default_factory=list,
+        max_length=_VIDEOS,
+        description=(
+            f"视频地址。可空，最多 {_VIDEOS} 条。不是 http(s)，或写成内网、本机地址的会丢掉，重复的也会丢掉，卡片仍入库。"
+            "域名不在这台服务器上解析。"
+            "直接的视频地址（.mp4、.mov、.m4v、.webm、.m3u8）会在详情里播放。"
+            "网页观看地址会变成外跳链接。不要把播放器标签写进正文。"
+        ),
     )
     source_urls: list[str] = Field(
         default_factory=list,
         max_length=_SOURCE_URLS,
-        description=f"原文链接。最多 {_SOURCE_URLS} 条公网 http(s)。",
+        description=(
+            f"原文链接。最多 {_SOURCE_URLS} 条 http(s)。"
+            "域名不在这台服务器上解析。写成 IP 时不能是内网、本机或链路本地地址。"
+        ),
     )
     source: str = Field(
         default="",
@@ -134,7 +208,7 @@ class CardIn(BaseModel):
                 kept.append(item)
         return kept
 
-    @field_validator("source_urls", "image_urls", mode="before")
+    @field_validator("source_urls", "image_urls", "video_urls", mode="before")
     @classmethod
     def _strip_urls(cls, value: object) -> object:
         if not isinstance(value, list):
@@ -172,7 +246,9 @@ def publish_cards(
 ) -> list[str]:
     del media_dir  # kept so callers stay the same; new cards are not written to disk
     ready = _validate(cards)
-    rows = _rows([(card, _public_images(card)) for card in ready])
+    rows = _rows(
+        [(card, _public_images(card), _public_urls(card.video_urls)) for card in ready]
+    )
     descriptions: dict[str, str] = {}
     for card, row in zip(ready, rows, strict=True):
         row.user_id = user_id
@@ -191,8 +267,12 @@ def publish_cards(
 
 
 def _public_images(card: CardIn) -> list[str]:
+    return _public_urls(card.image_urls)
+
+
+def _public_urls(urls: list[str]) -> list[str]:
     kept: list[str] = []
-    for url in card.image_urls:
+    for url in urls:
         if is_public_url(url) and url not in kept:
             kept.append(url)
     return kept
@@ -243,8 +323,16 @@ def _problem(exc: ValidationError) -> str:
         detail = f"第 {int(loc[1]) + 1} 条 {field} 超过 {ctx.get('max_length')} 个字"
     elif kind == "too_long" and field == "tags":
         detail = f"tags 超过 {ctx.get('max_length')} 个"
+    elif kind == "too_long" and field == "charts" and loc[-1] == "series":
+        detail = f"charts 的 series 超过 {ctx.get('max_length')} 组"
+    elif kind == "too_long" and field == "charts" and loc[-1] == "labels":
+        detail = f"charts 的 labels 超过 {ctx.get('max_length')} 项"
+    elif kind == "too_long" and field == "charts":
+        detail = f"charts 超过 {ctx.get('max_length')} 张"
     elif kind == "too_long":
         detail = f"{field} 超过 {ctx.get('max_length')} 条"
+    elif kind == "literal_error" and field == "charts":
+        detail = "charts 的 type 必须是 bar、line 或 pie"
     elif kind == "literal_error":
         detail = "category 必须是：" + "、".join(CATEGORIES)
     elif kind == "list_type":
@@ -260,11 +348,11 @@ def _problem(exc: ValidationError) -> str:
     return f"{detail}。{_hint()}"
 
 
-def _rows(saved: list[tuple[CardIn, list[str]]]) -> list[Card]:
+def _rows(saved: list[tuple[CardIn, list[str], list[str]]]) -> list[Card]:
     base = now()
     rows: list[Card] = []
     total = len(saved)
-    for index, (card, images) in enumerate(saved):
+    for index, (card, images, videos) in enumerate(saved):
         rows.append(
             Card(
                 id=new_id(),
@@ -281,6 +369,8 @@ def _rows(saved: list[tuple[CardIn, list[str]]]) -> list[Card]:
                 processor="",
                 is_read=False,
                 created_at=(base + timedelta(microseconds=total - index)).isoformat(),
+                charts=[item.model_dump() for item in card.charts],
+                video_urls=videos,
             )
         )
     return rows

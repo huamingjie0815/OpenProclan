@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sqlite3
 import threading
 from pathlib import Path
@@ -11,7 +12,7 @@ from proclan_server.app import create_app
 from proclan_server.categories import CATEGORIES
 from proclan_server.config import Settings
 from proclan_server.limits import NameCap, RateLimited
-from proclan_server.publish import CardIn, CardRejected, publish_cards
+from proclan_server.publish import _CHART_SHAPE, CardIn, CardRejected, publish_cards
 from proclan_server.set_password import main as set_password_main
 from proclan_server.store import Card, Store, new_id, now
 
@@ -190,6 +191,10 @@ async def test_submit_cards_schema_is_the_contract(api):
     if "$ref" in item:
         item = schema["$defs"][item["$ref"].rsplit("/", 1)[-1]]
     assert item["required"] == model["required"]
+    listed = json.dumps(raw, ensure_ascii=False)
+    assert "[[chart:0]]" in listed
+    assert _CHART_SHAPE in listed or "产量" in listed
+    assert "详情里播放" in listed
 
 
 async def test_cards_belong_to_the_token_and_expire_after_a_day(api):
@@ -365,6 +370,8 @@ def test_existing_database_gains_owner_column(tmp_path: Path):
         columns = {row[1] for row in conn.execute("PRAGMA table_info(cards)")}
     assert "created_bot" in columns
     assert "user_id" in columns
+    assert "charts_json" in columns
+    assert "video_urls_json" in columns
 
 
 def test_existing_bot_names_gain_description(tmp_path: Path):
@@ -909,6 +916,113 @@ async def test_mixed_batch_does_not_spend_the_other_bot(tmp_path: Path):
     )
     titles = [item.title for item in app.state.store.list_cards(category=None, limit=10, user_id="user-1")]
     assert titles == ["乙的第一张", "已有"]
+
+
+def _bar(name: str = "产量") -> dict:
+    return {
+        "type": "bar",
+        "title": "本周",
+        "labels": ["甲", "乙"],
+        "series": [{"name": name, "data": [1, 2]}],
+    }
+
+
+async def test_charts_and_videos_stay_as_submitted(api):
+    client, app = api
+    owner = await _register(client, "Ada")
+    reader = await _register(client, "Bea")
+    owner_headers = _auth(owner["token"])
+    reader_headers = _auth(reader["token"])
+    body = "正文 **重点**\n\n[[chart:0]]\n\n<script>alert(1)</script>"
+    chart = _bar()
+    ids = publish_cards(
+        app.state.store,
+        app.state.settings.media_dir,
+        [
+            card(
+                body=body,
+                charts=[chart],
+                video_urls=[
+                    "https://1.1.1.1/clip.mp4",
+                    "http://127.0.0.1/local.mp4",
+                    "https://1.1.1.1/clip.mp4",
+                    "https://1.1.1.1/page",
+                ],
+            )
+        ],
+        user_id=owner["user"]["id"],
+    )
+    shown = (await client.get(f"/v1/feed/{ids[0]}", headers=owner_headers)).json()
+    assert shown["body"] == body
+    assert shown["charts"] == [chart]
+    assert shown["video_urls"] == [
+        "https://1.1.1.1/clip.mp4",
+        "https://1.1.1.1/page",
+    ]
+    shared = await client.post(
+        "/v1/community/share",
+        json={"name": "Proclan"},
+        headers=owner_headers,
+    )
+    assert shared.status_code == 200
+    followed = await client.post(
+        "/v1/community/follow",
+        json={"owner_id": owner["user"]["id"], "name": "Proclan"},
+        headers=reader_headers,
+    )
+    assert followed.status_code == 204
+    copied = publish_cards(
+        app.state.store,
+        app.state.settings.media_dir,
+        [card(title="副本", body=body, charts=[chart, _bar("另一")], video_urls=["https://1.1.1.1/b.m3u8"])],
+        user_id=owner["user"]["id"],
+    )
+    feed = (await client.get("/v1/feed", headers=reader_headers)).json()["cards"]
+    assert feed[0]["id"] != copied[0] or feed[0]["title"] == "副本"
+    match = next(item for item in feed if item["title"] == "副本")
+    assert match["body"] == body
+    assert match["charts"] == [chart, _bar("另一")]
+    assert match["video_urls"] == ["https://1.1.1.1/b.m3u8"]
+
+
+async def test_bad_charts_reject_the_card(api):
+    _, app = api
+
+    def publish(**overrides):
+        publish_cards(
+            app.state.store,
+            app.state.settings.media_dir,
+            [card(**overrides)],
+            user_id="user-1",
+        )
+
+    with pytest.raises(CardRejected, match="charts 超过 8 张"):
+        publish(charts=[_bar(str(i)) for i in range(9)])
+    with pytest.raises(CardRejected, match="series 超过 4 组"):
+        publish(
+            charts=[
+                {
+                    "type": "line",
+                    "labels": ["甲"],
+                    "series": [{"data": [1]} for _ in range(5)],
+                }
+            ]
+        )
+    with pytest.raises(CardRejected, match="type 必须是 bar、line 或 pie"):
+        publish(charts=[{"type": "scatter", "labels": ["甲"], "series": [{"data": [1]}]}])
+    with pytest.raises(CardRejected, match="长度必须和 labels 一样"):
+        publish(charts=[{"type": "bar", "labels": ["甲", "乙"], "series": [{"data": [1]}]}])
+    with pytest.raises(CardRejected, match="pie 只能有一组 series"):
+        publish(
+            charts=[
+                {
+                    "type": "pie",
+                    "labels": ["甲", "乙"],
+                    "series": [{"data": [1, 2]}, {"data": [3, 4]}],
+                }
+            ]
+        )
+    assert app.state.store.list_cards(category=None, limit=10, user_id="user-1") == []
 
 
 async def test_mcp_body_over_one_mebibyte_is_rejected(tmp_path: Path):
