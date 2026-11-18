@@ -39,10 +39,12 @@ class BotProfile {
     required this.botDesc,
     required this.cards,
     this.listed = false,
+    this.direct = false,
     this.code = '',
     this.likes = 0,
     this.dislikes = 0,
     this.follows = 0,
+    this.audience = const [],
   });
 
   final String name;
@@ -50,10 +52,28 @@ class BotProfile {
   final String botDesc;
   final List<FeedCard> cards;
   final bool listed;
+  final bool direct;
   final String code;
   final int likes;
   final int dislikes;
   final int follows;
+  final List<String> audience;
+
+  BotProfile copyWith({List<FeedCard>? cards}) {
+    return BotProfile(
+      name: name,
+      firstSeen: firstSeen,
+      botDesc: botDesc,
+      cards: cards ?? this.cards,
+      listed: listed,
+      direct: direct,
+      code: code,
+      likes: likes,
+      dislikes: dislikes,
+      follows: follows,
+      audience: audience,
+    );
+  }
 
   factory BotProfile.fromJson(Map<String, dynamic> json) {
     final raw = json['cards'];
@@ -66,14 +86,22 @@ class BotProfile {
       }
     }
     final community = json['community'];
-    final stamp = community is Map ? Map<String, dynamic>.from(community) : const {};
+    final stamp = community is Map
+        ? Map<String, dynamic>.from(community)
+        : const {};
     return BotProfile(
       name: json['name'] as String? ?? '',
       firstSeen: json['first_seen'] as String? ?? '',
       botDesc: json['bot_desc'] as String? ?? '',
       cards: cards,
       listed: stamp['listed'] == true,
+      direct: stamp['direct'] == true,
       code: stamp['code'] as String? ?? '',
+      audience: [
+        if (stamp['audience'] is List)
+          for (final item in stamp['audience'] as List)
+            if (item is String) item,
+      ],
       likes: stamp['likes'] as int? ?? 0,
       dislikes: stamp['dislikes'] as int? ?? 0,
       follows: stamp['follows'] as int? ?? 0,
@@ -111,6 +139,9 @@ String accountMessage(AppLocalizations l, AccountException error) {
     'invalid password' => l.invalidPassword,
     'invalid token' => l.sessionExpired,
     'bot not found' => l.botMissing,
+    'user not found' => l.userNotFound,
+    'cannot share with yourself' => l.cannotShareWithYourself,
+    'stop sharing first' => l.stopSharingFirst,
     _ => l.authFailed,
   };
 }
@@ -297,10 +328,42 @@ class AccountClient {
   Future<void> unshareBot(String name) {
     return _send(
       () => _http.delete(
-        Uri.parse('$baseUrl/v1/community/share').replace(
-          queryParameters: {'name': name},
-        ),
+        Uri.parse('$baseUrl/v1/community/share')
+            .replace(queryParameters: {'name': name}),
         headers: _headers,
+      ),
+      const {200},
+    );
+  }
+
+  Future<void> grantBot(String name, String username) {
+    return _send(
+      () => _http.post(
+        Uri.parse('$baseUrl/v1/community/direct'),
+        headers: _headers,
+        body: jsonEncode({'name': name, 'username': username}),
+      ),
+      const {200},
+    );
+  }
+
+  Future<void> revokeBot(String name, String username) {
+    return _send(
+      () => _http.delete(
+        Uri.parse('$baseUrl/v1/community/direct')
+            .replace(queryParameters: {'name': name, 'username': username}),
+        headers: _headers,
+      ),
+      const {200},
+    );
+  }
+
+  Future<void> setDirect(String name, bool on) {
+    return _send(
+      () => _http.post(
+        Uri.parse('$baseUrl/v1/community/direct/active'),
+        headers: _headers,
+        body: jsonEncode({'name': name, 'on': on}),
       ),
       const {200},
     );

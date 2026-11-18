@@ -16,6 +16,8 @@ class CommunityPage extends StatefulWidget {
     this.feed,
     this.copiesOwnerId,
     this.copiesName,
+    this.guestOwnerId,
+    this.guestName,
     this.onCardOpened,
     this.onCardResult,
   });
@@ -24,6 +26,8 @@ class CommunityPage extends StatefulWidget {
   final FeedClient? feed;
   final String? copiesOwnerId;
   final String? copiesName;
+  final String? guestOwnerId;
+  final String? guestName;
   final void Function(FeedCard card)? onCardOpened;
   final void Function(FeedCard card, DetailResult result)? onCardResult;
 
@@ -32,6 +36,12 @@ class CommunityPage extends StatefulWidget {
       copiesOwnerId!.isNotEmpty &&
       copiesName != null &&
       copiesName!.isNotEmpty;
+
+  bool get fromGuest =>
+      guestOwnerId != null &&
+      guestOwnerId!.isNotEmpty &&
+      guestName != null &&
+      guestName!.isNotEmpty;
 
   @override
   State<CommunityPage> createState() => _CommunityPageState();
@@ -80,6 +90,9 @@ class _CommunityPageState extends State<CommunityPage> {
     if (widget.fromBots) {
       _stack = const [];
       _openInitialCopies();
+    } else if (widget.fromGuest) {
+      _stack = const [];
+      _openGuest(widget.guestOwnerId!, widget.guestName!);
     } else {
       _loadBoard();
     }
@@ -111,7 +124,13 @@ class _CommunityPageState extends State<CommunityPage> {
       });
     } on AccountException catch (error) {
       if (mounted && epoch == _epoch) {
-        setState(() => _error = accountMessage(AppLocalizations.of(context), error));
+        setState(
+          () => _error = accountMessage(AppLocalizations.of(context), error),
+        );
+      }
+    } catch (_) {
+      if (mounted && epoch == _epoch) {
+        setState(() => _error = AppLocalizations.of(context).offline);
       }
     } finally {
       if (mounted && epoch == _epoch) {
@@ -134,7 +153,13 @@ class _CommunityPageState extends State<CommunityPage> {
       setState(() => _bots = bots);
     } on AccountException catch (error) {
       if (mounted && epoch == _epoch) {
-        setState(() => _error = accountMessage(AppLocalizations.of(context), error));
+        setState(
+          () => _error = accountMessage(AppLocalizations.of(context), error),
+        );
+      }
+    } catch (_) {
+      if (mounted && epoch == _epoch) {
+        setState(() => _error = AppLocalizations.of(context).offline);
       }
     } finally {
       if (mounted && epoch == _epoch) {
@@ -155,6 +180,7 @@ class _CommunityPageState extends State<CommunityPage> {
 
   void _clearSearch() {
     _search.clear();
+    _onSearch('');
   }
 
   void _pick(_Section section) {
@@ -184,7 +210,14 @@ class _CommunityPageState extends State<CommunityPage> {
       });
     } on AccountException catch (error) {
       if (mounted) {
-        showRedNotice(context, accountMessage(AppLocalizations.of(context), error));
+        showRedNotice(
+          context,
+          accountMessage(AppLocalizations.of(context), error),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).offline);
       }
     } finally {
       if (mounted) {
@@ -203,7 +236,14 @@ class _CommunityPageState extends State<CommunityPage> {
       setState(() => _stack = [..._stack, _Place.guest(bot)]);
     } on AccountException catch (error) {
       if (mounted) {
-        showRedNotice(context, accountMessage(AppLocalizations.of(context), error));
+        showRedNotice(
+          context,
+          accountMessage(AppLocalizations.of(context), error),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).offline);
       }
     } finally {
       if (mounted) {
@@ -215,7 +255,10 @@ class _CommunityPageState extends State<CommunityPage> {
   Future<void> _openCopies(CommunityBot bot) async {
     setState(() => _busy = true);
     try {
-      final copies = await widget.client.copies(ownerId: bot.ownerId, name: bot.name);
+      final copies = await widget.client.copies(
+        ownerId: bot.ownerId,
+        name: bot.name,
+      );
       if (!mounted) {
         return;
       }
@@ -224,7 +267,14 @@ class _CommunityPageState extends State<CommunityPage> {
       });
     } on AccountException catch (error) {
       if (mounted) {
-        showRedNotice(context, accountMessage(AppLocalizations.of(context), error));
+        showRedNotice(
+          context,
+          accountMessage(AppLocalizations.of(context), error),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).offline);
       }
     } finally {
       if (mounted) {
@@ -238,8 +288,13 @@ class _CommunityPageState extends State<CommunityPage> {
     if (guest == null) {
       return;
     }
-    final bot = await widget.client.bot(ownerId: guest.ownerId, name: guest.name);
-    if (!mounted || _top?.kind != _Kind.guest) {
+    final bot = await widget.client.bot(
+      ownerId: guest.ownerId,
+      name: guest.name,
+    );
+    if (!mounted ||
+        _top?.guest?.ownerId != guest.ownerId ||
+        _top?.guest?.name != guest.name) {
       return;
     }
     final next = [..._stack];
@@ -249,7 +304,7 @@ class _CommunityPageState extends State<CommunityPage> {
 
   Future<void> _toggleFollow() async {
     final guest = _top?.guest;
-    if (guest == null || guest.mine) {
+    if (_busy || guest == null || guest.mine) {
       return;
     }
     final wasFollowing = guest.following;
@@ -264,21 +319,25 @@ class _CommunityPageState extends State<CommunityPage> {
       if (!ok || !mounted) {
         return;
       }
-      await widget.client.unfollow(ownerId: guest.ownerId, name: guest.name);
-    } else if (guest.listed) {
-      await widget.client.follow(ownerId: guest.ownerId, name: guest.name);
-    } else {
+    } else if (!guest.listed && !guest.direct) {
       return;
     }
-    if (!mounted) {
-      return;
-    }
-    final l = AppLocalizations.of(context);
-    showRedNotice(
-      context,
-      wasFollowing ? l.communityUnfollowed : l.communityFollowed,
-    );
-    await _refreshGuest();
+    await _runAction(() async {
+      if (wasFollowing) {
+        await widget.client.unfollow(ownerId: guest.ownerId, name: guest.name);
+      } else {
+        await widget.client.follow(ownerId: guest.ownerId, name: guest.name);
+      }
+      if (!mounted) {
+        return;
+      }
+      final l = AppLocalizations.of(context);
+      showRedNotice(
+        context,
+        wasFollowing ? l.communityUnfollowed : l.communityFollowed,
+      );
+      await _refreshGuest();
+    });
   }
 
   Future<void> _vote(int vote) async {
@@ -287,8 +346,39 @@ class _CommunityPageState extends State<CommunityPage> {
       return;
     }
     final next = guest.vote == vote ? 0 : vote;
-    await widget.client.vote(ownerId: guest.ownerId, name: guest.name, vote: next);
-    await _refreshGuest();
+    await _runAction(() async {
+      await widget.client.vote(
+        ownerId: guest.ownerId,
+        name: guest.name,
+        vote: next,
+      );
+      await _refreshGuest();
+    });
+  }
+
+  Future<void> _runAction(Future<void> Function() action) async {
+    if (_busy) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await action();
+    } on AccountException catch (error) {
+      if (mounted) {
+        showRedNotice(
+          context,
+          accountMessage(AppLocalizations.of(context), error),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showRedNotice(context, AppLocalizations.of(context).offline);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
   }
 
   Future<void> _copyCode(String code) async {
@@ -315,7 +405,10 @@ class _CommunityPageState extends State<CommunityPage> {
           under.kind == _Kind.copies &&
           guest != null &&
           copies != null) {
-        next[next.length - 1] = _Place.copies(copies, following: guest.following);
+        next[next.length - 1] = _Place.copies(
+          copies,
+          following: guest.following,
+        );
       }
       setState(() => _stack = next);
       return;
@@ -335,7 +428,7 @@ class _CommunityPageState extends State<CommunityPage> {
       _Kind.copies => top!.copies!.name,
       _ => l.community,
     };
-    final backTip = top?.kind == _Kind.copies && widget.fromBots && _stack.length == 1
+    final backTip = _stack.length == 1 && (widget.fromBots || widget.fromGuest)
         ? l.bots
         : l.communityBack;
     return PopScope(
@@ -365,7 +458,9 @@ class _CommunityPageState extends State<CommunityPage> {
                         onVote: _vote,
                         onCopy: () => _copyCode(top.guest!.code),
                         onOpenCard: _openPreview,
-                        onAll: top.guest!.following ? () => _openCopies(top.guest!) : null,
+                        onAll: top.guest!.following
+                            ? () => _openCopies(top.guest!)
+                            : null,
                       )
                     else if (top?.kind == _Kind.copies)
                       _Copies(
@@ -373,7 +468,8 @@ class _CommunityPageState extends State<CommunityPage> {
                         following: top.following,
                         busy: _busy,
                         onUnfollow: _unfollowFromCopies,
-                        onOpenGuest: () => _openGuest(top.copies!.ownerId, top.copies!.name),
+                        onOpenGuest: () =>
+                            _openGuest(top.copies!.ownerId, top.copies!.name),
                         onOpenCard: _openOwned,
                       )
                     else if (top?.kind == _Kind.board)
@@ -445,7 +541,10 @@ class _CommunityPageState extends State<CommunityPage> {
       ),
       if (_error != null) ...[
         const SizedBox(height: 16),
-        Text(_error!, style: Red.text(size: 14, height: 1.5, color: Red.dangerFg)),
+        Text(
+          _error!,
+          style: Red.text(size: 14, height: 1.5, color: Red.dangerFg),
+        ),
       ] else if (_bots.isEmpty && !_busy)
         _EmptyBoard(query: _searching ? _query : null)
       else
@@ -453,7 +552,9 @@ class _CommunityPageState extends State<CommunityPage> {
           _BotRow(
             bot: _bots[i],
             index: i,
-            count: _section == _Section.follows ? _bots[i].follows : _bots[i].likes,
+            count: _section == _Section.follows
+                ? _bots[i].follows
+                : _bots[i].likes,
             countLabel: countLabel,
             first: i == 0,
             onTap: () => _openGuest(_bots[i].ownerId, _bots[i].name),
@@ -504,14 +605,16 @@ class _CommunityPageState extends State<CommunityPage> {
     if (!ok || !mounted) {
       return;
     }
-    await widget.client.unfollow(ownerId: copies.ownerId, name: copies.name);
-    if (!mounted || _top?.kind != _Kind.copies) {
-      return;
-    }
-    final next = [..._stack];
-    next[next.length - 1] = _Place.copies(copies, following: false);
-    setState(() => _stack = next);
-    showRedNotice(context, l.communityUnfollowed);
+    await _runAction(() async {
+      await widget.client.unfollow(ownerId: copies.ownerId, name: copies.name);
+      if (!mounted || _top != place) {
+        return;
+      }
+      final next = [..._stack];
+      next[next.length - 1] = _Place.copies(copies, following: false);
+      setState(() => _stack = next);
+      showRedNotice(context, l.communityUnfollowed);
+    });
   }
 }
 
@@ -646,8 +749,11 @@ class _Guest extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final card = bot.card;
     final canVote = bot.listed && !bot.mine && !busy;
-    final canFollow = !bot.mine && !busy && (bot.listed || bot.following);
-    final owner = bot.mine ? '${bot.ownerName} · ${l.communityMine}' : bot.ownerName;
+    final canFollow =
+        !bot.mine && !busy && (bot.listed || bot.direct || bot.following);
+    final owner = bot.mine
+        ? '${bot.ownerName} · ${l.communityMine}'
+        : bot.ownerName;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -686,12 +792,16 @@ class _Guest extends StatelessWidget {
                             owner,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Red.text(size: 11, height: 1.4, color: Red.muted),
+                            style: Red.text(
+                              size: 11,
+                              height: 1.4,
+                              color: Red.muted,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    if (!bot.listed)
+                    if (!bot.listed && !bot.direct)
                       Text(
                         l.communityOffline.toUpperCase(),
                         key: const Key('community-offline'),
@@ -706,7 +816,10 @@ class _Guest extends StatelessWidget {
                 ),
                 if (bot.botDesc.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  Text(bot.botDesc, style: Red.text(size: 14, height: 1.6, color: Red.fg2)),
+                  Text(
+                    bot.botDesc,
+                    style: Red.text(size: 14, height: 1.6, color: Red.fg2),
+                  ),
                 ],
                 const SizedBox(height: 18),
                 DecoratedBox(
@@ -719,7 +832,10 @@ class _Guest extends StatelessWidget {
                       children: [
                         _Stat(value: bot.likes, label: l.communityLike),
                         _Stat(value: bot.dislikes, label: l.communityDislike),
-                        _Stat(value: bot.follows, label: l.communityFollowerCount),
+                        _Stat(
+                          value: bot.follows,
+                          label: l.communityFollowerCount,
+                        ),
                       ],
                     ),
                   ),
@@ -731,7 +847,9 @@ class _Guest extends StatelessWidget {
                     children: [
                       _IconAction(
                         key: const Key('community-follow'),
-                        tooltip: bot.following ? l.communityUnfollow : l.communityFollow,
+                        tooltip: bot.following
+                            ? l.communityUnfollow
+                            : l.communityFollow,
                         kind: _LineKind.eye,
                         color: bot.following ? Red.followFg : Red.meta,
                         onPressed: canFollow ? onFollow : null,
@@ -783,11 +901,18 @@ class _Guest extends StatelessWidget {
               foregroundColor: Red.fg2,
               side: BorderSide(color: Red.border),
               minimumSize: const Size.fromHeight(44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
             child: Text(
               l.communityAllCards,
-              style: Red.text(size: 12, height: 1, weight: FontWeight.w500, color: Red.fg2),
+              style: Red.text(
+                size: 12,
+                height: 1,
+                weight: FontWeight.w500,
+                color: Red.fg2,
+              ),
             ),
           ),
         ],
@@ -835,7 +960,7 @@ class _Copies extends StatelessWidget {
                     style: Red.text(size: 12, height: 1.4, color: Red.muted),
                   ),
                 ),
-                if (!page.listed)
+                if (!page.listed && !page.direct)
                   Text(
                     l.communityOffline.toUpperCase(),
                     key: const Key('community-offline'),
@@ -881,7 +1006,10 @@ class _Copies extends StatelessWidget {
         else
           for (var i = 0; i < page.cards.length; i++) ...[
             if (i > 0) const SizedBox(height: 10),
-            _CardPreview(card: page.cards[i], onTap: () => onOpenCard(page.cards[i])),
+            _CardPreview(
+              card: page.cards[i],
+              onTap: () => onOpenCard(page.cards[i]),
+            ),
           ],
       ],
     );
@@ -951,18 +1079,30 @@ class _BotRow extends StatelessWidget {
                       bot.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Red.text(size: 15, height: 1.35, weight: FontWeight.w500),
+                      style: Red.text(
+                        size: 15,
+                        height: 1.35,
+                        weight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text.rich(
                       TextSpan(
-                        style: Red.text(size: 11.5, height: 1.45, color: Red.muted),
+                        style: Red.text(
+                          size: 11.5,
+                          height: 1.45,
+                          color: Red.muted,
+                        ),
                         children: [
                           TextSpan(text: sub),
-                          if (!bot.listed)
+                          if (!bot.listed && !bot.direct)
                             TextSpan(
                               text: ' · ${l.communityOffline}',
-                              style: Red.text(size: 11.5, height: 1.45, color: Red.dangerFg),
+                              style: Red.text(
+                                size: 11.5,
+                                height: 1.45,
+                                color: Red.dangerFg,
+                              ),
                             ),
                         ],
                       ),
@@ -978,7 +1118,12 @@ class _BotRow extends StatelessWidget {
                 children: [
                   Text(
                     '$count',
-                    style: Red.text(size: 15, height: 1.1, weight: FontWeight.w500, tabular: true),
+                    style: Red.text(
+                      size: 15,
+                      height: 1.1,
+                      weight: FontWeight.w500,
+                      tabular: true,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1112,12 +1257,22 @@ class _Stat extends StatelessWidget {
         children: [
           Text(
             '$value',
-            style: Red.text(size: 19, height: 1.1, weight: FontWeight.w500, tabular: true),
+            style: Red.text(
+              size: 19,
+              height: 1.1,
+              weight: FontWeight.w500,
+              tabular: true,
+            ),
           ),
           const SizedBox(height: 3),
           Text(
             label,
-            style: Red.text(size: 10, height: 1.3, letterSpacing: 0.5, color: Red.meta),
+            style: Red.text(
+              size: 10,
+              height: 1.3,
+              letterSpacing: 0.5,
+              color: Red.meta,
+            ),
           ),
         ],
       ),
@@ -1242,7 +1397,12 @@ class _Tab extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: Red.text(size: 12.5, height: 1.2, weight: FontWeight.w500, color: color),
+                  style: Red.text(
+                    size: 12.5,
+                    height: 1.2,
+                    weight: FontWeight.w500,
+                    color: color,
+                  ),
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -1296,7 +1456,9 @@ class _IconAction extends StatelessWidget {
         padding: EdgeInsets.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        overlayColor: Red.dark ? const Color(0x0FFFFFFF) : const Color(0x0D09090B),
+        overlayColor: Red.dark
+            ? const Color(0x0FFFFFFF)
+            : const Color(0x0D09090B),
       ),
       icon: _LineIcon(kind, color: shown),
     );
@@ -1414,13 +1576,11 @@ class _Action extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
-    this.selected = false,
     this.danger = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
-  final bool selected;
   final bool danger;
 
   @override
@@ -1430,22 +1590,18 @@ class _Action extends StatelessWidget {
         ? Red.muted
         : danger
         ? Red.dangerFg
-        : selected
-        ? Red.accentOn
         : Red.fg2;
     final side = !enabled
         ? Red.borderSoft
         : danger
         ? Red.dangerLine
-        : selected
-        ? Red.accent
         : Red.border;
     return Expanded(
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: foreground,
-          backgroundColor: selected && enabled ? Red.accent : Colors.transparent,
+          backgroundColor: Colors.transparent,
           disabledForegroundColor: Red.muted,
           side: BorderSide(color: side),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
@@ -1457,7 +1613,12 @@ class _Action extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: Red.text(size: 12, height: 1, weight: FontWeight.w500, color: foreground),
+          style: Red.text(
+            size: 12,
+            height: 1,
+            weight: FontWeight.w500,
+            color: foreground,
+          ),
         ),
       ),
     );
@@ -1465,7 +1626,11 @@ class _Action extends StatelessWidget {
 }
 
 class _Bar extends StatelessWidget {
-  const _Bar({required this.title, required this.tooltip, required this.onBack});
+  const _Bar({
+    required this.title,
+    required this.tooltip,
+    required this.onBack,
+  });
 
   final String title;
   final String tooltip;
@@ -1545,9 +1710,19 @@ Future<bool> _confirm(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(title, style: Red.text(size: 16, height: 1.35, weight: FontWeight.w500)),
+                Text(
+                  title,
+                  style: Red.text(
+                    size: 16,
+                    height: 1.35,
+                    weight: FontWeight.w500,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                Text(body, style: Red.text(size: 14, height: 1.5, color: Red.muted)),
+                Text(
+                  body,
+                  style: Red.text(size: 14, height: 1.5, color: Red.muted),
+                ),
                 const SizedBox(height: 18),
                 Row(
                   children: [
@@ -1562,7 +1737,9 @@ Future<bool> _confirm(
                       style: FilledButton.styleFrom(
                         backgroundColor: Red.danger,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
                       child: Text(action),
                     ),

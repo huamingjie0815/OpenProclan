@@ -49,7 +49,9 @@ class _AccountPageState extends State<AccountPage> {
   var _busy = false;
   List<String> _bots = const [];
   List<CommunityGroup> _followed = const [];
+  List<CommunityBot> _directed = const [];
   final _treeCollapsed = <String, bool>{};
+  final _directName = TextEditingController();
   String? _botName;
   BotProfile? _botProfile;
 
@@ -69,6 +71,7 @@ class _AccountPageState extends State<AccountPage> {
     _username.dispose();
     _currentPassword.dispose();
     _newPassword.dispose();
+    _directName.dispose();
     super.dispose();
   }
 
@@ -97,10 +100,14 @@ class _AccountPageState extends State<AccountPage> {
     }
     try {
       final groups = await community.following();
+      final directed = await community.directed();
       if (!mounted) {
         return;
       }
-      setState(() => _followed = groups);
+      setState(() {
+        _followed = groups;
+        _directed = directed;
+      });
     } catch (_) {}
   }
 
@@ -347,6 +354,39 @@ class _AccountPageState extends State<AccountPage> {
     });
   }
 
+  void _openDirected(String ownerId, String name) {
+    final community = widget.community;
+    if (community == null) {
+      return;
+    }
+    Navigator.push<void>(
+      context,
+      PageRouteBuilder<void>(
+        pageBuilder: (_, _, _) => CommunityPage(
+          client: community,
+          feed: widget.feed,
+          guestOwnerId: ownerId,
+          guestName: name,
+          onCardOpened: widget.onCardOpened,
+          onCardResult: widget.onCardResult,
+        ),
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        transitionsBuilder: (_, animation, _, child) {
+          final offset = Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: animation, curve: Red.ease));
+          return SlideTransition(position: offset, child: child);
+        },
+      ),
+    ).then((_) {
+      if (mounted) {
+        _loadFollowing();
+      }
+    });
+  }
+
   Future<void> _openCard(FeedCard card) async {
     final feed = widget.feed;
     if (feed == null) {
@@ -371,19 +411,11 @@ class _AccountPageState extends State<AccountPage> {
       return;
     }
     setState(() {
-      _botProfile = BotProfile(
-        name: profile.name,
-        firstSeen: profile.firstSeen,
-        botDesc: profile.botDesc,
+      _botProfile = profile.copyWith(
         cards: [
           for (final item in profile.cards)
             if (item.id != card.id) item,
         ],
-        listed: profile.listed,
-        code: profile.code,
-        likes: profile.likes,
-        dislikes: profile.dislikes,
-        follows: profile.follows,
       );
     });
   }
@@ -394,13 +426,23 @@ class _AccountPageState extends State<AccountPage> {
     if (name == null || account == null) {
       return;
     }
+    final l = AppLocalizations.of(context);
     if (!next) {
-      final l = AppLocalizations.of(context);
       final ok = await _confirm(
         context,
         title: l.communityShareStopTitle,
         body: l.communityShareStopBody,
         action: l.communityShareStop,
+      );
+      if (!ok || !mounted) {
+        return;
+      }
+    } else if (_botProfile?.direct == true) {
+      final ok = await _confirm(
+        context,
+        title: l.communitySharePublicTitle,
+        body: l.communitySharePublicBody,
+        action: l.communitySharePublic,
       );
       if (!ok || !mounted) {
         return;
@@ -422,6 +464,98 @@ class _AccountPageState extends State<AccountPage> {
         next
             ? AppLocalizations.of(context).communitySharedDone
             : AppLocalizations.of(context).communityUnsharedDone,
+      );
+    });
+  }
+
+  Future<void> _reloadBot(String name) async {
+    final account = _account;
+    if (account == null) {
+      return;
+    }
+    final profile = await account.botProfile(name);
+    if (!mounted || _botName != name) {
+      return;
+    }
+    setState(() => _botProfile = profile);
+  }
+
+  Future<void> _setDirect(bool next) async {
+    final name = _botName;
+    final account = _account;
+    if (name == null || account == null) {
+      return;
+    }
+    if (!next) {
+      final l = AppLocalizations.of(context);
+      final ok = await _confirm(
+        context,
+        title: l.communityDirectStopTitle,
+        body: l.communityDirectStopBody,
+        action: l.communityDirectStop,
+      );
+      if (!ok || !mounted) {
+        return;
+      }
+    }
+    await _run(() async {
+      await account.setDirect(name, next);
+      await _reloadBot(name);
+      if (!mounted) {
+        return;
+      }
+      showRedNotice(
+        context,
+        next
+            ? AppLocalizations.of(context).communityDirectOnDone
+            : AppLocalizations.of(context).communityDirectPausedDone,
+      );
+    });
+  }
+
+  Future<void> _addDirect() async {
+    final name = _botName;
+    final account = _account;
+    final username = _directName.text.trim();
+    if (name == null || account == null || username.isEmpty) {
+      return;
+    }
+    await _run(() async {
+      await account.grantBot(name, username);
+      await _reloadBot(name);
+      if (!mounted) {
+        return;
+      }
+      _directName.clear();
+      showRedNotice(context, AppLocalizations.of(context).communityDirectAdded);
+    });
+  }
+
+  Future<void> _removeDirect(String username) async {
+    final name = _botName;
+    final account = _account;
+    if (name == null || account == null) {
+      return;
+    }
+    final l = AppLocalizations.of(context);
+    final ok = await _confirm(
+      context,
+      title: l.communityDirectRemoveTitle,
+      body: l.communityDirectRemoveBody(username),
+      action: l.communityDirectRemove,
+    );
+    if (!ok || !mounted) {
+      return;
+    }
+    await _run(() async {
+      await account.revokeBot(name, username);
+      await _reloadBot(name);
+      if (!mounted) {
+        return;
+      }
+      showRedNotice(
+        context,
+        AppLocalizations.of(context).communityDirectRemoved,
       );
     });
   }
@@ -592,10 +726,32 @@ class _AccountPageState extends State<AccountPage> {
                                         _BotTreeRow(
                                           key: Key('bot-$name'),
                                           name: name,
-                                          onTap: _busy ? null : () => _openBot(name),
+                                          onTap: _busy
+                                              ? null
+                                              : () => _openBot(name),
                                         ),
                                     ],
                             ),
+                            if (_directed.isNotEmpty)
+                              _BotTreeGroup(
+                                label: l.communityDirectedInbox,
+                                count: _directed.length,
+                                collapsed: _treeCollapsed['directed'] ?? false,
+                                onToggle: () => _toggleTree('directed'),
+                                labelKey: const Key('community-directed'),
+                                children: [
+                                  for (final bot in _directed)
+                                    _BotTreeRow(
+                                      key: Key(
+                                        'directed-${bot.ownerId}-${bot.name}',
+                                      ),
+                                      name: bot.name,
+                                      status: bot.ownerName,
+                                      onTap: () =>
+                                          _openDirected(bot.ownerId, bot.name),
+                                    ),
+                                ],
+                              ),
                             for (final group in _followed)
                               _BotTreeGroup(
                                 label: group.ownerName,
@@ -605,14 +761,23 @@ class _AccountPageState extends State<AccountPage> {
                                     false,
                                 onToggle: () =>
                                     _toggleTree('owner:${group.ownerId}'),
-                                labelKey: Key('community-user-${group.ownerId}'),
+                                labelKey: Key(
+                                  'community-user-${group.ownerId}',
+                                ),
                                 children: [
                                   for (final bot in group.bots)
                                     _BotTreeRow(
-                                      key: Key('followed-${group.ownerId}-${bot.name}'),
+                                      key: Key(
+                                        'followed-${group.ownerId}-${bot.name}',
+                                      ),
                                       name: bot.name,
-                                      status: bot.listed ? null : l.communityOffline,
-                                      onTap: () => _openFollowed(group.ownerId, bot.name),
+                                      status: bot.listed || bot.direct
+                                          ? null
+                                          : l.communityOffline,
+                                      onTap: () => _openFollowed(
+                                        group.ownerId,
+                                        bot.name,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -713,6 +878,10 @@ class _AccountPageState extends State<AccountPage> {
                         onDelete: _deleteBot,
                         onOpen: _openCard,
                         onShare: _setShared,
+                        onDirect: _setDirect,
+                        onAddDirect: _addDirect,
+                        onRemoveDirect: _removeDirect,
+                        directName: _directName,
                         onCopyCode: _copyCode,
                       ),
                   ],
@@ -724,7 +893,6 @@ class _AccountPageState extends State<AccountPage> {
       ),
     );
   }
-
 }
 
 String mcpUrl(String baseUrl) {
@@ -760,6 +928,10 @@ class _BotBody extends StatelessWidget {
     required this.onDelete,
     required this.onOpen,
     required this.onShare,
+    required this.onDirect,
+    required this.onAddDirect,
+    required this.onRemoveDirect,
+    required this.directName,
     required this.onCopyCode,
   });
 
@@ -768,6 +940,10 @@ class _BotBody extends StatelessWidget {
   final VoidCallback onDelete;
   final ValueChanged<FeedCard> onOpen;
   final ValueChanged<bool> onShare;
+  final ValueChanged<bool> onDirect;
+  final VoidCallback onAddDirect;
+  final ValueChanged<String> onRemoveDirect;
+  final TextEditingController directName;
   final VoidCallback onCopyCode;
 
   @override
@@ -832,14 +1008,40 @@ class _BotBody extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              profile.listed ? l.communityShared : l.communityNotShared,
-                              style: Red.text(size: 14, height: 1.35, weight: FontWeight.w500),
+                              profile.listed
+                                  ? l.communityShared
+                                  : profile.direct
+                                  ? l.communityDirected
+                                  : profile.audience.isNotEmpty
+                                  ? l.communityDirectedPaused
+                                  : l.communityNotShared,
+                              style: Red.text(
+                                size: 14,
+                                height: 1.35,
+                                weight: FontWeight.w500,
+                              ),
                             ),
+                            if (profile.listed &&
+                                profile.audience.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                l.communityDirectedDormant,
+                                style: Red.text(
+                                  size: 11,
+                                  height: 1.45,
+                                  color: Red.muted,
+                                ),
+                              ),
+                            ],
                             if (profile.code.isNotEmpty) ...[
                               const SizedBox(height: 3),
                               Text(
                                 '${l.communityCode} ${profile.code} · ${profile.likes} ${l.communityLike} · ${profile.follows} ${l.communityFollowerCount}',
-                                style: Red.text(size: 11, height: 1.45, color: Red.muted),
+                                style: Red.text(
+                                  size: 11,
+                                  height: 1.45,
+                                  color: Red.muted,
+                                ),
                               ),
                             ],
                           ],
@@ -893,12 +1095,85 @@ class _BotBody extends StatelessWidget {
                             ),
                           ),
                         ),
-                        _TextAction(label: l.communityCopy, onPressed: onCopyCode),
+                        _TextAction(
+                          label: l.communityCopy,
+                          onPressed: onCopyCode,
+                        ),
                       ],
                     ),
                   ),
                 ),
               ],
+              const SizedBox(height: 18),
+              Text(
+                l.communityDirect,
+                style: Red.text(
+                  size: 14,
+                  height: 1.35,
+                  weight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l.communityDirectNote,
+                style: Red.text(size: 12, height: 1.5, color: Red.muted),
+              ),
+              if (profile.audience.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                for (final person in profile.audience)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            person,
+                            key: Key('direct-person-$person'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Red.text(size: 14, height: 1.4),
+                          ),
+                        ),
+                        _TextAction(
+                          key: Key('direct-remove-$person'),
+                          label: l.communityDirectRemove,
+                          onPressed: busy ? null : () => onRemoveDirect(person),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 12),
+              _LineField(
+                controller: directName,
+                label: l.communityDirectUsername,
+                fieldKey: const Key('direct-username'),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _TextAction(
+                  key: const Key('direct-add'),
+                  label: l.communityDirectAdd,
+                  onPressed: busy ? null : onAddDirect,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l.communityDirectOn,
+                      style: Red.text(size: 14, height: 1.35),
+                    ),
+                  ),
+                  Switch(
+                    key: const Key('direct-community'),
+                    value: profile.direct,
+                    onChanged: busy ? null : onDirect,
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -982,7 +1257,11 @@ class _BotTreeGroup extends StatelessWidget {
                     turns: collapsed ? -0.25 : 0,
                     duration: const Duration(milliseconds: 150),
                     curve: Red.ease,
-                    child: Icon(Icons.keyboard_arrow_down, size: 14, color: Red.meta),
+                    child: Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 14,
+                      color: Red.meta,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -1001,7 +1280,12 @@ class _BotTreeGroup extends StatelessWidget {
                   ),
                   Text(
                     '$count',
-                    style: Red.text(size: 11, height: 1.4, color: Red.meta, tabular: true),
+                    style: Red.text(
+                      size: 11,
+                      height: 1.4,
+                      color: Red.meta,
+                      tabular: true,
+                    ),
                   ),
                 ],
               ),
@@ -1054,7 +1338,11 @@ class _BotTreeRow extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Red.text(size: 14, height: 1.4, weight: FontWeight.w500),
+                  style: Red.text(
+                    size: 14,
+                    height: 1.4,
+                    weight: FontWeight.w500,
+                  ),
                 ),
               ),
               if (status != null) ...[
@@ -1186,23 +1474,20 @@ class _TocCard extends StatelessWidget {
 
 class _TocRow extends StatelessWidget {
   const _TocRow({
-    super.key,
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.danger = false,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? Red.dangerFg : Red.fg;
+    final color = Red.fg;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -1211,18 +1496,14 @@ class _TocRow extends StatelessWidget {
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
-                color: danger ? Red.dangerSoft : Red.surfaceWarm,
+                color: Red.surfaceWarm,
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: danger ? Red.dangerLine : Red.border),
+                border: Border.all(color: Red.border),
               ),
               child: SizedBox(
                 width: 36,
                 height: 36,
-                child: Icon(
-                  icon,
-                  size: 18,
-                  color: danger ? Red.dangerFg : Red.fg2,
-                ),
+                child: Icon(icon, size: 18, color: Red.fg2),
               ),
             ),
             const SizedBox(width: 14),
@@ -1714,25 +1995,19 @@ class _Switch extends StatelessWidget {
 class _LineField extends StatelessWidget {
   const _LineField({
     this.controller,
-    this.value,
     required this.label,
     this.secret = false,
-    this.readOnly = false,
+    this.fieldKey,
   });
 
   final TextEditingController? controller;
-  final String? value;
   final String label;
   final bool secret;
-  final bool readOnly;
+  final Key? fieldKey;
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = Red.text(
-      size: 15,
-      height: 1.2,
-      color: readOnly ? Red.meta : Red.fg,
-    );
+    final textStyle = Red.text(size: 15, height: 1.2, color: Red.fg);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1747,54 +2022,36 @@ class _LineField extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 7),
-        if (readOnly)
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Red.surfaceWarm,
+        TextField(
+          key: fieldKey,
+          controller: controller,
+          obscureText: secret,
+          autocorrect: false,
+          enableSuggestions: !secret,
+          style: textStyle,
+          cursorColor: Red.accent,
+          decoration: InputDecoration(
+            isCollapsed: true,
+            filled: true,
+            fillColor: Red.surfaceWarm,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 13,
+              vertical: 14,
+            ),
+            enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Red.border),
+              borderSide: BorderSide(color: Red.border),
             ),
-            child: SizedBox(
-              height: 46,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 13),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(value ?? '', style: textStyle),
-                ),
-              ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: Red.accent),
             ),
-          )
-        else
-          TextField(
-            controller: controller,
-            obscureText: secret,
-            autocorrect: false,
-            enableSuggestions: !secret,
-            style: textStyle,
-            cursorColor: Red.accent,
-            decoration: InputDecoration(
-              isCollapsed: true,
-              filled: true,
-              fillColor: Red.surfaceWarm,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 13,
-                vertical: 14,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: Red.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: Red.accent),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: Red.border),
-              ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: Red.border),
             ),
           ),
+        ),
       ],
     );
   }

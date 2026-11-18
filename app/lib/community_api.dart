@@ -20,6 +20,7 @@ class CommunityBot {
     this.following = false,
     this.vote = 0,
     this.mine = false,
+    this.direct = false,
     this.card,
   });
 
@@ -36,6 +37,7 @@ class CommunityBot {
   final bool following;
   final int vote;
   final bool mine;
+  final bool direct;
   final FeedCard? card;
 
   factory CommunityBot.fromJson(Map<String, dynamic> json) {
@@ -54,6 +56,7 @@ class CommunityBot {
       following: json['following'] == true,
       vote: json['vote'] as int? ?? 0,
       mine: json['mine'] == true,
+      direct: json['direct'] == true,
       card: raw is Map
           ? FeedCard.fromJson(Map<String, dynamic>.from(raw))
           : null,
@@ -66,11 +69,13 @@ class FollowedBot {
     required this.name,
     required this.listed,
     required this.botDesc,
+    this.direct = false,
   });
 
   final String name;
   final bool listed;
   final String botDesc;
+  final bool direct;
 }
 
 class CommunityGroup {
@@ -96,6 +101,7 @@ class CommunityGroup {
               FollowedBot(
                 name: item['name'] as String? ?? '',
                 listed: item['listed'] == true,
+                direct: item['direct'] == true,
                 botDesc: item['bot_desc'] as String? ?? '',
               ),
       ],
@@ -111,12 +117,14 @@ class CommunityCopies {
     required this.listed,
     required this.botDesc,
     required this.cards,
+    this.direct = false,
   });
 
   final String ownerId;
   final String ownerName;
   final String name;
   final bool listed;
+  final bool direct;
   final String botDesc;
   final List<FeedCard> cards;
 
@@ -127,12 +135,12 @@ class CommunityCopies {
       ownerName: json['owner_name'] as String? ?? '',
       name: json['name'] as String? ?? '',
       listed: json['listed'] == true,
+      direct: json['direct'] == true,
       botDesc: json['bot_desc'] as String? ?? '',
       cards: [
         if (raw is List)
           for (final item in raw)
-            if (item is Map)
-              FeedCard.fromJson(Map<String, dynamic>.from(item)),
+            if (item is Map) FeedCard.fromJson(Map<String, dynamic>.from(item)),
       ],
     );
   }
@@ -143,6 +151,7 @@ abstract class CommunityClient {
   Future<List<CommunityBot>> search(String query);
   Future<CommunityBot> bot({required String ownerId, required String name});
   Future<List<CommunityGroup>> following();
+  Future<List<CommunityBot>> directed();
   Future<CommunityCopies> copies({
     required String ownerId,
     required String name,
@@ -179,9 +188,8 @@ class HttpCommunityClient implements CommunityClient {
   Future<List<CommunityBot>> board(String kind) async {
     final body = await _send(
       () => _http.get(
-        Uri.parse('$baseUrl/v1/community/board').replace(
-          queryParameters: {'kind': kind},
-        ),
+        Uri.parse('$baseUrl/v1/community/board')
+            .replace(queryParameters: {'kind': kind}),
         headers: _headers,
       ),
     );
@@ -192,9 +200,8 @@ class HttpCommunityClient implements CommunityClient {
   Future<List<CommunityBot>> search(String query) async {
     final body = await _send(
       () => _http.get(
-        Uri.parse('$baseUrl/v1/community/search').replace(
-          queryParameters: {'q': query},
-        ),
+        Uri.parse('$baseUrl/v1/community/search')
+            .replace(queryParameters: {'q': query}),
         headers: _headers,
       ),
     );
@@ -208,9 +215,8 @@ class HttpCommunityClient implements CommunityClient {
   }) async {
     final body = await _send(
       () => _http.get(
-        Uri.parse('$baseUrl/v1/community/bot').replace(
-          queryParameters: {'owner_id': ownerId, 'name': name},
-        ),
+        Uri.parse('$baseUrl/v1/community/bot')
+            .replace(queryParameters: {'owner_id': ownerId, 'name': name}),
         headers: _headers,
       ),
     );
@@ -237,15 +243,25 @@ class HttpCommunityClient implements CommunityClient {
   }
 
   @override
+  Future<List<CommunityBot>> directed() async {
+    final body = await _send(
+      () => _http.get(
+        Uri.parse('$baseUrl/v1/community/directed'),
+        headers: _headers,
+      ),
+    );
+    return _bots(body);
+  }
+
+  @override
   Future<CommunityCopies> copies({
     required String ownerId,
     required String name,
   }) async {
     final body = await _send(
       () => _http.get(
-        Uri.parse('$baseUrl/v1/community/copies').replace(
-          queryParameters: {'owner_id': ownerId, 'name': name},
-        ),
+        Uri.parse('$baseUrl/v1/community/copies')
+            .replace(queryParameters: {'owner_id': ownerId, 'name': name}),
         headers: _headers,
       ),
     );
@@ -268,9 +284,8 @@ class HttpCommunityClient implements CommunityClient {
   Future<void> unfollow({required String ownerId, required String name}) async {
     await _send(
       () => _http.delete(
-        Uri.parse('$baseUrl/v1/community/follow').replace(
-          queryParameters: {'owner_id': ownerId, 'name': name},
-        ),
+        Uri.parse('$baseUrl/v1/community/follow')
+            .replace(queryParameters: {'owner_id': ownerId, 'name': name}),
         headers: _headers,
       ),
       const {204},
@@ -287,11 +302,7 @@ class HttpCommunityClient implements CommunityClient {
       () => _http.post(
         Uri.parse('$baseUrl/v1/community/vote'),
         headers: _headers,
-        body: jsonEncode({
-          'owner_id': ownerId,
-          'name': name,
-          'vote': vote,
-        }),
+        body: jsonEncode({'owner_id': ownerId, 'name': name, 'vote': vote}),
       ),
       const {204},
     );

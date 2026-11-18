@@ -7,11 +7,7 @@ import 'red.dart';
 enum _Mode { login, register }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({
-    super.key,
-    required this.client,
-    required this.onSignedIn,
-  });
+  const LoginPage({super.key, required this.client, required this.onSignedIn});
 
   final AccountClient client;
   final ValueChanged<AuthSession> onSignedIn;
@@ -540,7 +536,6 @@ class _Field extends StatelessWidget {
     required this.label,
     this.hint,
     this.secret = false,
-    this.bare = false,
     this.onSubmit,
     this.onToggle,
   });
@@ -549,7 +544,6 @@ class _Field extends StatelessWidget {
   final String label;
   final String? hint;
   final bool secret;
-  final bool bare;
   final VoidCallback? onSubmit;
   final VoidCallback? onToggle;
 
@@ -587,19 +581,17 @@ class _Field extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!bare) ...[
-          Text(
-            label.toUpperCase(),
-            style: Red.text(
-              size: 11,
-              height: 1.2,
-              weight: FontWeight.w500,
-              letterSpacing: 0.9,
-              color: Red.fg2,
-            ),
+        Text(
+          label.toUpperCase(),
+          style: Red.text(
+            size: 11,
+            height: 1.2,
+            weight: FontWeight.w500,
+            letterSpacing: 0.9,
+            color: Red.fg2,
           ),
-          const SizedBox(height: 8),
-        ],
+        ),
+        const SizedBox(height: 8),
         if (onToggle == null)
           field
         else

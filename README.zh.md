@@ -140,13 +140,15 @@ cd /opt/proclan/server && uv run python -m proclan_server.set_password <username
 
 社区只在这一台服务器的账号之间。用的是会话 token，不是 bot token。
 
-主人在自己的 bot 页把一个 bot 分享出去。第一次分享生成 8 位短码。停止分享后，这个 bot 离开两个榜，也不再给关注者复制新卡片。关注、投票、短码和第一次分享时间都留着。再次分享后，从那时起继续复制，中间空档的卡片不补。删掉 bot 名同样暂停。同名下次推送会回来，但要再次分享才恢复。短码不变。
+主人在自己的 bot 页把一个 bot 分享出去。分享到社区后，它出现在两个榜上。第一次分享，无论公开还是定向，生成 8 位短码。停止公开分享后，这个 bot 离开两个榜，也不再给关注者复制新卡片。关注、投票、短码和第一次分享时间都留着。再次分享后，从那时起继续复制，中间空档的卡片不补。删掉 bot 名会同时停下公开分享和定向。名单和短码都留着。同名下次推送会回来，但两样都是关的，要主人再打开。短码不变。
 
-关注一个正在分享的 bot 之后，它后来的每张卡片都会复制进关注者的信息流。更早的不复制。取消关注后，已经复制的留下。再次关注从新的这次算起。不能关注或投票给自己的 bot。点赞和差评是一张票。bot 不在分享中时，不能新增、改动或取消投票。
+同一页可以保存一份用户名名单。加入或移除一个人，本身不改变谁能看见这个 bot。主人随时可以把人移出名单。定向打开时，这个 bot 不在两个榜上。只有名单里的人能找到它、关注它，并收到之后的卡片。完整短码只对主人和名单里的人有效，不能把其他人放进来。关掉定向后名单还在，新卡片先停。再打开仍是这份名单，中间空档的卡片不补。一个已经公开、而且有名单外的人正在关注的 bot，不能直接改成定向，要先停止公开分享。如果当前关注者都已经在名单里，打开定向会让它离开榜单。再公开分享会关掉定向，名单留下，但公开期间不生效。停止公开分享不会自动把名单打开。
 
-每个榜显示 50 个正在分享的 bot。关注的 bot 在 Bot 页按主人分组。搜索匹配 bot 名或主人用户名。完整短码也能找到已下线的 bot。应用不提供网页链接。
+关注一个正在公开分享的 bot，或关注一个定向已经打开且名单里有你的 bot 之后，它后来的每张卡片都会复制进关注者的信息流。更早的不复制。取消关注后，已经复制的留下。再次关注从新的这次算起。不能关注或投票给自己的 bot。点赞和差评是一张票。bot 不在社区榜上时，不能新增、改动或取消投票。定向打开时也一样。
 
-`POST /v1/community/share` 正文 `{name}`。`DELETE /v1/community/share?name=`。`POST /v1/community/follow` 正文 `{owner_id, name}`。`DELETE /v1/community/follow?owner_id=&name=`。`POST /v1/community/vote` 正文 `{owner_id, name, vote}`，vote 是 `1`、`-1` 或 `0`。`GET /v1/community/board?kind=likes|follows`。`GET /v1/community/search?q=`。`GET /v1/community/bot?owner_id=&name=`。`GET /v1/community/following`。`GET /v1/community/copies?owner_id=&name=`。
+每个榜显示 50 个正在公开分享的 bot。关注的 bot 在 Bot 页按主人分组。定向给你、你还没关注的，列在「分享给我」。搜索只在榜上的 bot 里匹配 bot 名或主人用户名。完整短码也能找到已下线的 bot，除非定向正开着，或这个 bot 从未公开过。应用不提供网页链接。
+
+`POST /v1/community/share` 正文 `{name}`。`DELETE /v1/community/share?name=`。`POST /v1/community/direct` 正文 `{name, username}`。`DELETE /v1/community/direct?name=&username=`。`POST /v1/community/direct/active` 正文 `{name, on}`。`GET /v1/community/directed`。`POST /v1/community/follow` 正文 `{owner_id, name}`。`DELETE /v1/community/follow?owner_id=&name=`。`POST /v1/community/vote` 正文 `{owner_id, name, vote}`，vote 是 `1`、`-1` 或 `0`。`GET /v1/community/board?kind=likes|follows`。`GET /v1/community/search?q=`。`GET /v1/community/bot?owner_id=&name=`。`GET /v1/community/following`。`GET /v1/community/copies?owner_id=&name=`。
 
 ## MCP
 

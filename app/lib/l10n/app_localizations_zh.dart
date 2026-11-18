@@ -528,6 +528,83 @@ class AppLocalizationsZh extends AppLocalizations {
   String get communityNotShared => '未分享';
 
   @override
+  String get communityDirected => '只对名单中的人可见';
+
+  @override
+  String get communityDirectedPaused => '定向已暂停';
+
+  @override
+  String get communityDirectedDormant => '公开期间不生效';
+
+  @override
+  String get communityDirect => '定向分享';
+
+  @override
+  String get communityDirectNote => '加入用户名后打开开关。只有名单里的人能看到并关注，社区榜上看不到。';
+
+  @override
+  String get communityDirectAdd => '加入';
+
+  @override
+  String get communityDirectUsername => '用户名';
+
+  @override
+  String get communityDirectOn => '对这些人开放';
+
+  @override
+  String get communityDirectStopTitle => '暂停定向？';
+
+  @override
+  String get communityDirectStopBody => '这些人暂时看不到，也不再收到新卡片。名单还留着。';
+
+  @override
+  String get communityDirectStop => '暂停';
+
+  @override
+  String get communityDirectPausedDone => '定向已暂停';
+
+  @override
+  String get communityDirectOnDone => '已只对名单中的人开放';
+
+  @override
+  String get communityDirectAdded => '已加入名单';
+
+  @override
+  String get communityDirectRemoved => '已移出名单';
+
+  @override
+  String get communityDirectRemoveTitle => '移出名单？';
+
+  @override
+  String communityDirectRemoveBody(String name) {
+    return '$name 将不能再看到这个 Bot。已经收到的卡片还留着。';
+  }
+
+  @override
+  String get communityDirectRemove => '移出';
+
+  @override
+  String get communityDirectedInbox => '分享给我';
+
+  @override
+  String get communitySharePublicTitle => '改为公开分享？';
+
+  @override
+  String get communitySharePublicBody => '这个 Bot 会出现在社区榜单。名单还留着，但公开期间不生效。';
+
+  @override
+  String get communitySharePublic => '公开分享';
+
+  @override
+  String get stopSharingFirst => '先停止公开分享，才能改为定向';
+
+  @override
+  String get cannotShareWithYourself => '不能分享给自己';
+
+  @override
+  String get userNotFound => '没有这个用户';
+
+  @override
   String get communityShareStopTitle => '停止分享？';
 
   @override

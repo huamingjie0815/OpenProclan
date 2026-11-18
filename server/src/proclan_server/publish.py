@@ -44,7 +44,7 @@ def submit_cards_doc(
     name_refill_seconds: float,
     name_cap: int,
 ) -> str:
-    return f"""提交已经写好的新闻卡片。填写以本工具当前 inputSchema 为准，不要沿用记忆里的字段。
+    return f"""提交 bot 已完成的工作卡片。填写以本工具当前 inputSchema 为准，不要沿用记忆里的字段。
 
 一次 1 到 {MAX_CARDS} 张。{bot_limit_text(burst, refill_seconds)}
 {name_limit_text(name_burst, name_refill_seconds, name_cap)}
@@ -111,7 +111,7 @@ def _hint() -> str:
 
 
 class CardIn(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=_TITLE, description=f"标题。必填，最多 {_TITLE} 字。")
     category: CategoryName = Field(description="分类。必填。只能是 " + "、".join(CATEGORIES) + "。")
@@ -193,6 +193,18 @@ class CardIn(BaseModel):
         ),
     )
 
+    @field_validator("title")
+    @classmethod
+    def _nonblank_title(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("title 不能为空")
+        return value
+
+    @field_validator("category", "source", "created_bot", "bot_desc", mode="before")
+    @classmethod
+    def _strip_names(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
     @field_validator("tags", mode="before")
     @classmethod
     def _drop_blank_tags(cls, value: object) -> object:
@@ -201,9 +213,8 @@ class CardIn(BaseModel):
         kept: list[object] = []
         for item in value:
             if isinstance(item, str):
-                text = item.strip()
-                if text:
-                    kept.append(text)
+                if item.strip():
+                    kept.append(item)
             else:
                 kept.append(item)
         return kept

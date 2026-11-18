@@ -544,6 +544,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String get communityNotShared => 'Not shared';
 
   @override
+  String get communityDirected => 'Visible only to the list';
+
+  @override
+  String get communityDirectedPaused => 'Directed sharing is paused';
+
+  @override
+  String get communityDirectedDormant => 'Inactive while this bot is public';
+
+  @override
+  String get communityDirect => 'Directed sharing';
+
+  @override
+  String get communityDirectNote =>
+      'Add usernames, then turn the switch on. Only people on the list can see and follow this bot. It stays off the community boards.';
+
+  @override
+  String get communityDirectAdd => 'Add';
+
+  @override
+  String get communityDirectUsername => 'Username';
+
+  @override
+  String get communityDirectOn => 'Open to these people';
+
+  @override
+  String get communityDirectStopTitle => 'Pause directed sharing?';
+
+  @override
+  String get communityDirectStopBody =>
+      'These people cannot see it for now, and new cards stop. The list stays.';
+
+  @override
+  String get communityDirectStop => 'Pause';
+
+  @override
+  String get communityDirectPausedDone => 'Directed sharing paused';
+
+  @override
+  String get communityDirectOnDone => 'Open only to the list';
+
+  @override
+  String get communityDirectAdded => 'Added to the list';
+
+  @override
+  String get communityDirectRemoved => 'Removed from the list';
+
+  @override
+  String get communityDirectRemoveTitle => 'Remove from the list?';
+
+  @override
+  String communityDirectRemoveBody(String name) {
+    return '$name will no longer see this bot. Cards already received stay.';
+  }
+
+  @override
+  String get communityDirectRemove => 'Remove';
+
+  @override
+  String get communityDirectedInbox => 'Shared with me';
+
+  @override
+  String get communitySharePublicTitle => 'Share publicly?';
+
+  @override
+  String get communitySharePublicBody =>
+      'This bot joins the community boards. The list stays, and it does not apply while the bot is public.';
+
+  @override
+  String get communitySharePublic => 'Share publicly';
+
+  @override
+  String get stopSharingFirst =>
+      'Stop the public share before directing this bot';
+
+  @override
+  String get cannotShareWithYourself => 'You cannot share a bot with yourself';
+
+  @override
+  String get userNotFound => 'No user with that name';
+
+  @override
   String get communityShareStopTitle => 'Stop sharing?';
 
   @override

@@ -34,6 +34,7 @@ def register(store: Store, *, username: str, password: str) -> tuple[User, str, 
         raise AccountError(409, "username taken") from exc
     bot = store.set_bot_token(user.id, new_secret())
     session = store.create_session(user.id, expires_at=_session_expiry())
+    assert session is not None
     return user, session, bot
 
 
@@ -52,11 +53,15 @@ def login(store: Store, *, username: str, password: str) -> tuple[User, str]:
             lock_until=(moment + timedelta(minutes=15)).isoformat(),
         )
         raise AccountError(401, "invalid credentials")
-    store.clear_login_failures(user.id)
+    token = store.create_session(
+        user.id, expires_at=_session_expiry(), password_hash=user.password_hash,
+    )
+    if token is None:
+        raise AccountError(401, "invalid credentials")
     fresh = store.user_by_id(user.id)
     if fresh is None:
         raise AccountError(401, "invalid credentials")
-    return fresh, store.create_session(fresh.id, expires_at=_session_expiry())
+    return fresh, token
 
 
 def change_password(
@@ -68,8 +73,10 @@ def change_password(
     if not isinstance(current_password, str) or not verify_password(user.password_hash, current_password):
         raise AccountError(401, "wrong password")
     _password(new_password)
-    store.set_password(user_id, hash_password(new_password))
-    store.delete_sessions(user_id)
+    if not store.set_password(
+        user_id, hash_password(new_password), expected_hash=user.password_hash,
+    ):
+        raise AccountError(401, "wrong password")
 
 
 def set_password_for(store: Store, *, username: str, new_password: str) -> None:
@@ -79,7 +86,6 @@ def set_password_for(store: Store, *, username: str, new_password: str) -> None:
     if user is None:
         raise AccountError(404, "user not found")
     store.set_password(user.id, hash_password(new_password))
-    store.delete_sessions(user.id)
 
 
 def change_username(store: Store, user_id: str, username: str) -> User:
