@@ -6,7 +6,7 @@ Flutter client for Proclan. It reads your wall by day, opens an article (charts 
 
 From the repository root, `./scripts/run` starts the app and `./scripts/apk` builds the release APK. The server install is [../server/DEPLOY.md](../server/DEPLOY.md). Do not compile the app on the server.
 
-Every push to `main` builds the production APK in GitHub Actions with `API_BASE=https://proclan.online`; download it from the run's artifacts (30 days). Point the build elsewhere with the repository variable `PROCLAN_API_BASE`.
+The production APK is built in GitHub Actions only when someone runs the Android release workflow by hand. Set the repository variable `PROCLAN_API_BASE` to an https origin. Download it from the run's artifacts (30 days). The workflow has no default host.
 
 `app/.env` holds `API_BASE` only. Copy `app/.env.example` and set that origin. `./scripts/run dev` reads `app/.env.development`. `./scripts/run production` reads `app/.env.production`. The same word works after `./scripts/apk`. A bare command still reads `app/.env`. Create those files on the machine. Do not commit them. Do not put a token in any of them, and do not hardcode the address in source.
 

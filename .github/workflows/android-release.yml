@@ -1,14 +1,7 @@
 name: Android release
 
-# main 有新提交就出一个生产包；也可以在 Actions 页面手动触发。
-# 动到 App 或这个文件的 PR 先编一遍，免得合并后才发现编不过。
+# 不随 push 或 pull request 自动编译。在 Actions 页面手动运行。
 on:
-  push:
-    branches: [main]
-  pull_request:
-    paths:
-      - "app/**"
-      - ".github/workflows/android-release.yml"
   workflow_dispatch:
 
 permissions:
@@ -20,9 +13,9 @@ concurrency:
 
 env:
   FLUTTER_VERSION: 3.50.0
-  # 生产地址。App 把 API_BASE 当源站用，自己拼 /v1/...，所以这里不带路径。
-  # 想换地址不用改这个文件：仓库 Settings → Variables 加 PROCLAN_API_BASE。
-  API_BASE: ${{ vars.PROCLAN_API_BASE || 'https://proclan.online' }}
+  # 生产地址只来自仓库变量 PROCLAN_API_BASE。不要在这个文件里写默认域名。
+  # App 把 API_BASE 当源站用，自己拼 /v1/...，所以这里不带路径。
+  API_BASE: ${{ vars.PROCLAN_API_BASE }}
 
 jobs:
   apk:
@@ -52,6 +45,16 @@ jobs:
 
       - name: Write production env
         run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ]; then
+            if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+              echo "::error::Repository variable PROCLAN_API_BASE is empty. Set it to an https origin. Do not hardcode the address in the workflow."
+              exit 1
+            fi
+            echo "PROCLAN_API_BASE is not set; this ref will run tests only."
+            echo "SKIP_APK=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
           case "$API_BASE" in
             https://*) ;;
             *) echo "API_BASE must be an https origin, got: $API_BASE" >&2; exit 1 ;;
@@ -62,6 +65,7 @@ jobs:
       # 固定发布密钥。不写这份配置时 Gradle 会退回各机器自带的调试密钥，
       # 每次构建签名都不同，手机上覆盖安装就会报签名异常。
       - name: Write release signing
+        if: env.SKIP_APK != '1'
         env:
           KEYSTORE_BASE64: ${{ secrets.PROCLAN_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.PROCLAN_KEYSTORE_PASSWORD }}
@@ -98,10 +102,12 @@ jobs:
         run: flutter test
 
       - name: Build release APK
+        if: env.SKIP_APK != '1'
         run: ./scripts/apk production
 
       # 签名必须每次相同，否则手机上无法覆盖安装。这里把证书指纹打出来当证据。
       - name: Verify signature
+        if: env.SKIP_APK != '1'
         run: |
           apk=app/build/app/outputs/flutter-apk/app-release.apk
           signer=$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools" -name apksigner -type f | sort -V | tail -1)
@@ -113,6 +119,7 @@ jobs:
           fi
 
       - name: Checksum and summary
+        if: env.SKIP_APK != '1'
         run: |
           apk=app/build/app/outputs/flutter-apk/app-release.apk
           sha256sum "$apk" | tee apk.sha256
@@ -129,6 +136,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK
+        if: env.SKIP_APK != '1'
         uses: actions/upload-artifact@v7
         with:
           name: proclan-apk-${{ github.sha }}
@@ -151,7 +159,7 @@ jobs:
           sha=$(cut -d' ' -f1 apk.sha256)
           size=$(du -h "$apk" | cut -f1)
           {
-            printf 'main 分支自动构建的生产包，API_BASE=`%s`。\n\n' "$API_BASE"
+            printf '手动构建的生产包，API_BASE=`%s`。\n\n' "$API_BASE"
             printf '| 字段 | 值 |\n'
             printf '| --- | --- |\n'
             printf '| commit | `%s` |\n' "$GITHUB_SHA"
